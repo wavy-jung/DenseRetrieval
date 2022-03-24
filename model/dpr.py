@@ -1,4 +1,3 @@
-import os
 import numpy as np
 import tqdm
 
@@ -9,8 +8,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from transformers import (
     AutoTokenizer,
     BertModel, BertPreTrainedModel,
-    AdamW, get_linear_schedule_with_warmup,
-    TrainingArguments,
+    AdamW, get_linear_schedule_with_warmup
 )
 from rank_bm25 import BM25Okapi
 
