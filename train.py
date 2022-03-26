@@ -2,15 +2,16 @@ import argparse
 import pandas as pd
 from src.utils import set_seed
 from tqdm import tqdm
+from typing import NoReturn
 
 import torch
 import torch.nn as nn
 import torch.functional as F
 from torch.utils.data import DataLoader
 
-from model.dpr import BertEncoder, DenseRetrieval
+from model.dpr import DenseRetrieval
 from arguments import TrainingArguments
-from transformers import AutoTokenizer, AdamW, get_linear_schedule_with_warmup
+from transformers import AdamW, get_linear_schedule_with_warmup
 from datasets import load_dataset
 
 
@@ -20,7 +21,7 @@ def train(
     train_dataloader: DataLoader,
     args: TrainingArguments,
     num_neg: int = 1,
-):
+)->NoReturn:
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {"params": [p for n, p in p_encoder.named_parameters() if not any(nd in n for nd in no_decay)], "weight_decay": args.weight_decay},
@@ -99,39 +100,24 @@ def train(
 
 def set_train():
     set_seed()
-    args = TrainingArguments(
-        output_dir="dense_retireval",
-        evaluation_strategy="epoch",
-        learning_rate=5e-5,
-        per_device_train_batch_size=4,
-        per_device_eval_batch_size=4,
-        num_train_epochs=3,
-        weight_decay=0.01
-        )
+    args = TrainingArguments()
 
     train_dataset = load_dataset("klue", "mrc", split="train")
     valid_dataset = load_dataset("klue", "mrc", split="validation")
 
     model_checkpoint = "klue/bert-base"
-    tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-    p_encoder = BertEncoder.from_pretrained(model_checkpoint).to(args.device)
-    q_encoder = BertEncoder.from_pretrained(model_checkpoint).to(args.device)
 
     bm25_df = pd.read_csv("klue_bm25.csv")
     bm25_df["negatives"] = bm25_df["negatives"].apply(lambda lst: eval(lst))
 
-    retriever = DenseRetrieval(
-        args=args,
-        dataset=train_dataset,
-        num_neg=1,
-        tokenizer=tokenizer,
-        p_encoder=p_encoder,
-        q_encoder=q_encoder,
-        src_negatives=bm25_df,
-        valid_dataset=valid_dataset
-    )
+    retriever = DenseRetrieval(model_checkpoint)
 
-    retriever.train()
+    train(
+        p_encoder=retriever.p_encoder,
+        q_encoder=retriever.q_encoder,
+        train_dataloader=None,
+        num_neg=1
+    )
 
 
 if __name__ == "__main__":

@@ -7,11 +7,9 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from transformers import (
     AutoTokenizer,
-    BertModel, BertPreTrainedModel,
-    AdamW, get_linear_schedule_with_warmup
+    BertModel, BertPreTrainedModel
 )
 from transformers import DPRContextEncoder, DPRQuestionEncoder
-from rank_bm25 import BM25Okapi
 
 
 class DenseRetrieval:
