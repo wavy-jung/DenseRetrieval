@@ -1,3 +1,4 @@
+from typing import List, Union, Optional
 import numpy as np
 from tqdm import tqdm
 
@@ -5,6 +6,10 @@ from torch.utils.data import DataLoader, TensorDataset
 from rank_bm25 import BM25Okapi
 
 
+def get_bm25(corpus: List[str])->BM25Okapi:
+    pass
+
+# TODO
 def prepare_in_batch_negative(
     dataset=None,
     num_neg=1,
