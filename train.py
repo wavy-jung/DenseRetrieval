@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.functional as F
 from torch.utils.data import DataLoader
 
-from model.dpr import DenseRetrieval
+from model.dpr import DenseRetriever
 from arguments import TrainingArguments
 from transformers import AdamW, get_linear_schedule_with_warmup
 from datasets import load_dataset
@@ -110,7 +110,7 @@ def set_train():
     bm25_df = pd.read_csv("klue_bm25.csv")
     bm25_df["negatives"] = bm25_df["negatives"].apply(lambda lst: eval(lst))
 
-    retriever = DenseRetrieval(model_checkpoint)
+    retriever = DenseRetriever(model_checkpoint)
 
     train(
         p_encoder=retriever.p_encoder,

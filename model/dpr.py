@@ -6,22 +6,25 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 from transformers import (
-    AutoTokenizer,
+    AutoTokenizer, AutoModel,
     BertModel, BertPreTrainedModel
 )
-from transformers import DPRContextEncoder, DPRQuestionEncoder
+# from transformers import DPRContextEncoder, DPRQuestionEncoder
 
 
-class DenseRetrieval:
+
+class DenseRetriever:
     def __init__(self,
     encoder_name: str,
     tokenizer_name: str = None
     ):
-        self.p_encoder = DPRContextEncoder.from_pretrained(encoder_name)
-        self.q_encoder = DPRQuestionEncoder.from_pretrained(encoder_name)
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.p_encoder = AutoModel.from_pretrained(encoder_name).to(self.device)
+        self.q_encoder = AutoModel.from_pretrained(encoder_name).to(self.device)
         if tokenizer_name is None:
             tokenizer_name = encoder_name
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+
 
 
 class BertEncoder(BertPreTrainedModel):
@@ -46,6 +49,11 @@ class BertEncoder(BertPreTrainedModel):
         
         pooled_output = outputs[1]
         return pooled_output
+
+
+if __name__=="__main__":
+    retriever = DenseRetriever("klue/bert-base")
+    print(retriever.device)
 
 
 # class DenseRetrieval:
