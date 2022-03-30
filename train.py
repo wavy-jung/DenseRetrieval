@@ -22,6 +22,8 @@ def train(
     args: TrainingArguments,
     num_neg: int = 1,
 )->NoReturn:
+
+    set_train(args)
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {"params": [p for n, p in p_encoder.named_parameters() if not any(nd in n for nd in no_decay)], "weight_decay": args.weight_decay},
@@ -98,7 +100,7 @@ def train(
                 torch.cuda.empty_cache()
 
 
-def set_train():
+def set_train(args: TrainingArguments)->NoReturn:
     set_seed()
     args = TrainingArguments()
 
@@ -123,4 +125,10 @@ def set_train():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Arguments")
     parser.add_argument("--")
-    train()
+
+    retriever = DenseRetriever("klue/bert-base")
+    train(
+        p_encoder=retriever.p_encoder,
+        q_encoder=retriever.q_encoder,
+        #TODO
+    )

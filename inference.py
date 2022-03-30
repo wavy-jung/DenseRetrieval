@@ -2,12 +2,16 @@ import numpy as np
 import time
 from tqdm import tqdm
 from pprint import pprint
+from typing import NoReturn
 
 import torch
+import torch.nn as nn
+from torch.utils.data import Dataset
 from datasets import load_dataset
+from model.dpr import DenseRetriever
 
 
-def raw_inference(retriever, valid_dataset):
+def raw_inference(retriever: DenseRetriever, valid_dataset: Dataset)->NoReturn:
     idx = np.random.randint(len(valid_dataset))
     query = valid_dataset[idx]["question"]
 
@@ -27,13 +31,10 @@ def raw_inference(retriever, valid_dataset):
 
 
 def faiss_inference(
-    p_encoder,
-    q_encoder,
-    tokenizer,
-    valid_dataset,
-    device
-):
-    ds_with_embeddings = valid_dataset.map(lambda example: {"embeddings": p_encoder(**tokenizer(example["context"],
+    retriever: DenseRetriever,
+    valid_dataset: Dataset
+)->NoReturn:
+    ds_with_embeddings = valid_dataset.map(lambda example: {"embeddings": retriever.p_encoder(**retriever.tokenizer(example["context"],
                                                                                                 padding="max_length",
                                                                                                 truncation=True,
                                                                                                 return_tensors="pt").to(device).squeeze().cpu().numpy())})
@@ -42,8 +43,8 @@ def faiss_inference(
     # Validation Set의 전체 질문들에 대한 embedding 구해놓
     question_embedding = []
     for question in tqdm(valid_dataset["question"]):
-        tokenized = tokenizer(question, padding="max_length", truncation=True, return_tensors="pt").to(device)
-        encoded = q_encoder(**tokenized).squeeze().detach().cpu().numpy()
+        tokenized = retriever.tokenizer(question, padding="max_length", truncation=True, return_tensors="pt").to(retriever.device)
+        encoded = retriever.q_encoder(**tokenized).squeeze().detach().cpu().numpy()
         question_embedding.append(encoded)
 
     question_embedding = np.array(question_embedding)
