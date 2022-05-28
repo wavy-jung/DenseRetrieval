@@ -7,7 +7,7 @@ from typing import NoReturn
 import torch
 import torch.nn as nn
 import torch.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 from model.dpr import DenseRetriever
 from arguments import TrainingArguments
@@ -17,7 +17,7 @@ from datasets import load_dataset
 from inference import compute_metrics
 
 
-class Trainer(object):
+class DualTrainer(object):
     def __init__(self, 
         args: TrainingArguments,
         p_encoder: nn.Module,
@@ -26,7 +26,11 @@ class Trainer(object):
         valid_dataloader: DataLoader,
         test_dataloader: DataLoader = None
     ):
-        pass
+        self.p_encoder = p_encoder
+        self.q_encoder = q_encoder
+        self.train_dataloader = train_dataloader
+        self.valid_dataloader = valid_dataloader
+        self.test_dataloader = test_dataloader
 
     def train(self,):
         no_decay = ["bias", "LayerNorm.weight"]
@@ -48,7 +52,6 @@ class Trainer(object):
             num_training_steps=t_total
         )
 
-        # Start training!
         global_step = 0
 
         self.p_encoder.zero_grad()
@@ -59,13 +62,7 @@ class Trainer(object):
 
         train_iterator = tqdm(range(int(self.args.num_train_epochs)), desc="Epoch")
         for epoch in train_iterator:    
-            self.train_one_epoch(
-                self.p_encoder,
-                self.q_encoder,
-                self.train_dataloader,
-                optimizer,
-                scheduler
-            )
+            self.train_one_epoch(optimizer, scheduler, global_step)
 
             mrr_scores = self.validation(
 
@@ -86,11 +83,9 @@ class Trainer(object):
 
     def train_one_epoch(
         self,
-        p_encoder,
-        q_encoder,
-        train_dataloader,
         optimizer,
-        scheduler
+        scheduler,
+        global_step: int
     ):
         batch_size = self.args.per_device_train_batch_size
         with tqdm(self.train_dataloader, unit="batch") as tepoch:
@@ -139,13 +134,16 @@ class Trainer(object):
 
                 torch.cuda.empty_cache()
 
-
-    def inference():
+    @staticmethod
+    def inference(self, ):
         pass
 
 
+def set_dataset(tokenizer, ) -> TensorDataset:
+    pass
 
-def set_loader():
+
+def set_loader(dataset: TensorDataset) -> DataLoader:
     pass
 
 
@@ -153,7 +151,7 @@ def doc2id():
     pass
 
 
-def doc2embedding():
+def doc2embedding(p_encoder: nn.Module, dataloader: DataLoader):
     pass
 
 
@@ -161,3 +159,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Arguments")
     parser.add_argument("--")
     set_seed()
+
+    trainer = DualTrainer()
