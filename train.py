@@ -139,6 +139,10 @@ class DualTrainer(object):
         pass
 
 
+class Seq2SeqTrainer(object):
+    pass
+
+
 def set_dataset(tokenizer, ) -> TensorDataset:
     pass
 
