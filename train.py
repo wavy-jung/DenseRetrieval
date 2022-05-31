@@ -1,3 +1,4 @@
+import os
 import argparse
 import pandas as pd
 from src.utils import set_seed
@@ -14,7 +15,7 @@ from arguments import TrainingArguments
 from transformers import AdamW, get_linear_schedule_with_warmup
 from datasets import load_dataset
 
-from inference import compute_metrics
+from test import compute_metrics
 
 
 class DualTrainer(object):
@@ -73,8 +74,11 @@ class DualTrainer(object):
 
 
     def save_models(self, epoch):
-        self.p_encoder.save_pretrained()
-        self.q_encoder.save_pretrained()
+        base_path = "./encoder/"
+        if not os.path.exists(base_path):
+            os.mkdir(base_path)
+        self.p_encoder.save_pretrained(os.path.join(base_path, f"p_encoder_epoch{epoch}"))
+        self.q_encoder.save_pretrained(os.path.join(base_path, f"q_encoder_epoch{epoch}"))
 
 
     def validation():
@@ -111,9 +115,9 @@ class DualTrainer(object):
                 }
 
                 # (batch_size*(num_neg+1), emb_dim)
-                p_outputs = self.p_encoder(**p_inputs)["pooler_output"]
+                p_outputs = self.p_encoder(**p_inputs)
                 # (batch_size*, emb_dim)
-                q_outputs = self.q_encoder(**q_inputs)["pooler_output"]
+                q_outputs = self.q_encoder(**q_inputs)
 
                 # Calculate similarity score & loss
                 sim_scores = torch.matmul(q_outputs, p_outputs.T).squeeze() #(batch_size, num_neg + 1)
@@ -135,7 +139,12 @@ class DualTrainer(object):
                 torch.cuda.empty_cache()
 
     @staticmethod
-    def inference(self, ):
+    def inference(
+        self,
+        p_encoder: nn.Module,
+        q_encoder: nn.Module,
+        test_dataloader: DataLoader
+    ):
         pass
 
 
@@ -143,8 +152,14 @@ class Seq2SeqTrainer(object):
     pass
 
 
-def set_dataset(tokenizer, ) -> TensorDataset:
-    pass
+def set_dataset(
+    tokenizer,
+    q_seqs,
+    p_seqs,
+    num_neg: int = 1
+) -> TensorDataset:
+    assert len(p_seqs) == len(q_seqs)*(num_neg+1), "wrong passage sequence lengths"
+    
 
 
 def set_loader(dataset: TensorDataset) -> DataLoader:
@@ -155,8 +170,14 @@ def doc2id():
     pass
 
 
+@torch.no_grad()
 def doc2embedding(p_encoder: nn.Module, dataloader: DataLoader):
-    pass
+    doc_embedding = []
+    for batch in dataloader:
+        output = p_encoder(**batch)
+        doc_embedding.append(output)
+    doc_embedding = torch.cat(doc_embedding, dim=0)
+    return doc_embedding
 
 
 if __name__ == "__main__":
