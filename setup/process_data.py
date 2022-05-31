@@ -9,13 +9,18 @@ def main(args):
 
     if args.data_name == "tevatron":
         tevatron = load_dataset("Tevatron/msmarco-passage")
-        tevatron.save_to_disk(os.path.join(base_path, "/tevatron"))
+        tevatron.save_to_disk(os.path.join(base_path, "tevatron"))
 
     elif args.data_name == "squad2":
         squad2 = load_dataset("squad_v2")
         squad2.save_to_disk(os.path.join(base_path, "squad_v2"))
 
-    
+    elif args.data_name == "adversarial":
+        adversarial = load_dataset("adversarial_qa")
+        adversarial.save_to_disk(os.path.join(base_path, "adversarial_qa"))
+
+    else:
+        raise NotImplementedError
 
 
 if __name__ == '__main__':
