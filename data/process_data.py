@@ -1,6 +1,10 @@
+import os
 import re
-from typing import List, Union, Optional, Any, Callable
+import pandas as pd
 import numpy as np
+from datasets import load_from_disk
+from typing import List, Union, Optional, Any, Callable, Tuple
+
 from tqdm import tqdm
 
 from torch.utils.data import DataLoader, TensorDataset
@@ -13,12 +17,66 @@ def get_bm25(corpus: List[str], tokenize_fn: Callable)->BM25Okapi:
     return bm25
 
 
-def cleanse_corpus(corpus: Any[List, str])->Any[List, str]:
+def cleanse_corpus(corpus: Any[List, str]) -> Any[List, str]:
+    if isinstance(corpus, List[str]):
+        cleansed_corpus = [re.sub(f'[^- 0-9a-zA-Z]', ' ', text) for text in corpus]
+        return cleansed_corpus
+    else:
+        return re.sub(f'[^- 0-9a-zA-Z]', ' ', corpus)
+
+
+def cleanse_kor_corpus(corpus: Any[List, str]) -> Any[List, str]:
     if isinstance(corpus, List[str]):
         cleansed_corpus = [re.sub(f'[^- ㄱ-ㅎㅏ-ㅣ가-힣0-9a-zA-Z]', ' ', text) for text in corpus]
         return cleansed_corpus
     else:
         return re.sub(f'[^- ㄱ-ㅎㅏ-ㅣ가-힣0-9a-zA-Z]', ' ', corpus)
+
+
+class InBatchNegative:
+    def __init__(self, dataset_path: str, split: float = 0.2, num_neg: int = 1):
+        self.split = split
+        self.base_path = "./"
+        self.dataframe_path = os.path.join(self.base_path, dataset_path+".csv")
+        if "tevatron" in dataset_path and not os.path.exists(self.dataframe_path):
+            self.dataset = load_from_disk(os.path.join(dataset_path))["train"]
+            self.dataframe = self.to_dataframe()
+            self.dataframe.to_csv(self.dataframe_path, index=False)
+        else:
+            self.dataframe = pd.read_csv(self.dataframe_path)
+        
+    def to_dataframe(self):
+        queries, pos, neg = [], [], []
+        p_id, n_id = [], []
+        for idx in tqdm(range(len(self.dataset))):
+            queries.append(self.dataset[idx]["query"])
+            pos.append(self.dataset[idx]["positive_passages"][0]["text"])
+            neg.append(self.dataset[idx]["negative_passages"][0]["text"])
+            p_id.append(int(self.dataset[idx]["positive_passages"][0]["docid"]))
+            n_id.append(int(self.dataset[idx]["negative_passages"][0]["docid"]))
+        return pd.DataFrame({
+            "query": queries,
+            "pos": pos,
+            "neg": neg,
+            "p_id": p_id,
+            "n_id": n_id
+        })
+            
+    def split_df(self):
+        train_df = self.dataframe.sample(frac=0.8, random_state=0)
+        valid_df = self.dataframe.drop(train_df.index)[["query", "pos", "p_id"]]
+        return train_df, valid_df
+        
+
+    def p_with_neg(self, path: str = None):
+        if path.lower() == "tevatron":
+            pass
+        
+    def p_seqs(self,):
+        pass
+
+    def q_seqs(self, path: str = None):
+        pass
 
 
 # TODO

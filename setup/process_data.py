@@ -10,7 +10,7 @@ def save_data(dataname: str, path: str):
         print("dataset already saved to disk")
 
 
-def main(args):
+def cache_data(args):
     base_path = "../dataset/"
     if not os.path.exists(base_path):
         os.mkdir(base_path)
@@ -33,4 +33,4 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_name", default="tevatron")
     args = parser.parse_args()
-    main(args)
+    cache_data(args)
