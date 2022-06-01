@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
-from model.dpr import DenseRetriever
+from model.dpr import BertEncoder
 from arguments import TrainingArguments
 from transformers import AdamW, get_linear_schedule_with_warmup
 from datasets import load_dataset
@@ -141,11 +141,18 @@ class DualTrainer(object):
     @staticmethod
     def inference(
         self,
-        p_encoder: nn.Module,
-        q_encoder: nn.Module,
-        test_dataloader: DataLoader
+        p_encoder: nn.Module = None,
+        q_encoder: nn.Module = None,
+        test_dataloader: DataLoader = None
     ):
-        pass
+        if p_encoder is None:
+            p_encoder = self.p_encoder
+        if q_encoder is None:
+            q_encoder = self.q_encoder
+        if test_dataloader is None:
+            test_dataloader = self.test_dataloader
+
+        
 
 
 class Seq2SeqTrainer(object):
@@ -155,24 +162,54 @@ class Seq2SeqTrainer(object):
 def set_dataset(
     tokenizer,
     q_seqs,
-    p_seqs,
+    p_with_neg,
     num_neg: int = 1
 ) -> TensorDataset:
-    assert len(p_seqs) == len(q_seqs)*(num_neg+1), "wrong passage sequence lengths"
+    assert len(p_with_neg) == len(q_seqs)*(num_neg+1), "wrong passage sequence lengths"
+    q_seqs = tokenizer(
+        q_seqs,
+        padding="max_length",
+        truncation=True,
+        return_tensors="pt"
+    )
+    p_seqs = tokenizer(
+        p_with_neg,
+        padding="max_length",
+        truncation=True,
+        return_tensors="pt"
+    )
+
+    max_len = p_seqs["input_ids"].size(-1)
+    p_seqs["input_ids"] = p_seqs["input_ids"].view(-1, num_neg+1, max_len)
+    p_seqs["attention_mask"] = p_seqs["attention_mask"].view(-1, num_neg+1, max_len)
+    p_seqs["token_type_ids"] = p_seqs["token_type_ids"].view(-1, num_neg+1, max_len)
+
+    return TensorDataset(
+        p_seqs["input_ids"], p_seqs["attention_mask"], p_seqs["token_type_ids"], 
+        q_seqs["input_ids"], q_seqs["attention_mask"], q_seqs["token_type_ids"]
+    )
     
 
-
-def set_loader(dataset: TensorDataset) -> DataLoader:
-    pass
+def set_loader(dataset: TensorDataset, batch_size: int) -> DataLoader:
+    return DataLoader(
+        dataset,
+        shuffle=True,
+        batch_size=batch_size
+    )
 
 
 def doc2id():
     pass
 
 
+def get_all_docs(path: str):
+    pass
+
+
 @torch.no_grad()
 def doc2embedding(p_encoder: nn.Module, dataloader: DataLoader):
     doc_embedding = []
+    p_encoder.eval()
     for batch in dataloader:
         output = p_encoder(**batch)
         doc_embedding.append(output)
@@ -181,8 +218,11 @@ def doc2embedding(p_encoder: nn.Module, dataloader: DataLoader):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train Arguments")
-    parser.add_argument("--")
-    set_seed()
+    # parser = argparse.ArgumentParser(description="Train Arguments")
+    # parser.add_argument("--")
+    # set_seed()
 
-    trainer = DualTrainer()
+    # trainer = DualTrainer()
+    p_encoder = BertEncoder()
+    q_encoder = BertEncoder()
+    
