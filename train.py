@@ -3,7 +3,7 @@ import argparse
 import pandas as pd
 from src.utils import set_seed
 from tqdm import tqdm
-from typing import NoReturn
+from typing import NoReturn, List
 
 import torch
 import torch.nn as nn
@@ -29,6 +29,7 @@ class DualTrainer(object):
         doc_dataloader: DataLoader,
         test_dataloader: DataLoader = None
     ):
+        self.args = args
         self.p_encoder = p_encoder
         self.q_encoder = q_encoder
         self.train_dataloader = train_dataloader
@@ -85,15 +86,15 @@ class DualTrainer(object):
         self.p_encoder.save_pretrained(os.path.join(base_path, f"p_encoder_epoch{epoch}"))
         self.q_encoder.save_pretrained(os.path.join(base_path, f"q_encoder_epoch{epoch}"))
 
-
-    @torch.no_grad()
-    def doc2embedding(self, p_encoder: nn.Module, doc_dataloader: DataLoader):
+    @classmethod
+    def doc2embedding(cls, p_encoder: nn.Module, doc_dataloader: DataLoader):
         doc_embedding = []
-        p_encoder.eval()
-        for batch in tqdm(doc_dataloader):
-            output = p_encoder(**batch)
-            doc_embedding.append(output)
-        doc_embedding = torch.cat(doc_embedding, dim=0)
+        with torch.no_grad():
+            p_encoder.eval()
+            for batch in tqdm(doc_dataloader):
+                output = p_encoder(**batch)
+                doc_embedding.append(output)
+            doc_embedding = torch.cat(doc_embedding, dim=0)
         return doc_embedding
 
 
@@ -171,7 +172,8 @@ class DualTrainer(object):
         self,
         p_encoder: nn.Module = None,
         q_encoder: nn.Module = None,
-        test_dataloader: DataLoader = None
+        test_dataloader: DataLoader = None,
+        docs_loader: DataLoader = None
     ):
         if p_encoder is None:
             p_encoder = self.p_encoder
@@ -180,8 +182,32 @@ class DualTrainer(object):
         if test_dataloader is None:
             test_dataloader = self.test_dataloader
 
+        # get all doc embeddings
+        all_embeddings = []
+        for batch in tqdm(docs_loader):
+            output = p_encoder(**batch)
+            all_embeddings.append(output)
+        all_embeddings = torch.cat(all_embeddings, dim=0)
+
+        # matmul to get similarity score
+        all_rankings = []
+        for batch in tqdm(test_dataloader):
+            output = q_encoder(**batch)
+            sim_scores = F.softmax(torch.matmul(output, all_embeddings.unsqueeze(0).T).squeeze(), dim=1).detach().cpu()
+            ranking = torch.argsort(sim_scores)[:, :100]
+            all_rankings.append(ranking)
+        all_rankings.append(ranking)
+
+        # calculate up to MRR@100
+        pass
         
 
+    def calculate_mrr(self, gt_idx, rankings):
+        raise NotImplementedError
+        
+
+            
+        
 
 class Seq2SeqTrainer(object):
     pass
@@ -225,6 +251,9 @@ def set_loader(dataset: TensorDataset, batch_size: int) -> DataLoader:
         batch_size=batch_size
     )
 
+def dataloader_from_df(df: pd.DataFrame, columns: List[str]):
+    pass
+
 
 def doc2id():
     pass
@@ -250,8 +279,11 @@ if __name__ == "__main__":
     # parser.add_argument("--")
     # set_seed()
 
-    # trainer = DualTrainer()
     p_encoder = BertEncoder()
     q_encoder = BertEncoder()
+
+
+
+    trainer = DualTrainer()
 
 

@@ -3,7 +3,7 @@ import re
 import pandas as pd
 import numpy as np
 from datasets import load_from_disk
-from typing import List, Union, Optional, Any, Callable, Tuple
+from typing import List, NoReturn, Union, Optional, Any, Callable, Tuple
 
 from tqdm import tqdm
 
@@ -85,6 +85,10 @@ class InBatchNegative:
             q_seqs.append(query)
         return q_seqs
 
+    @staticmethod
+    def save_csv(self, df: pd.DataFrame):
+        raise NotImplementedError
+
 
 # TODO
 def prepare_in_batch_negative(
@@ -137,3 +141,12 @@ def prepare_in_batch_negative(
     )
 
     return train_dataloader
+
+
+if __name__ == "__main__":
+    dataset = InBatchNegative()
+    train_df, valid_df = dataset.split_df()
+    train_df.to_csv("./tevatron-train_df.csv", index=False)
+    valid_df.to_csv("./tevatron-valid_df.csv", index=False)
+
+    
