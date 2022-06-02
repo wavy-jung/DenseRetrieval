@@ -67,16 +67,23 @@ class InBatchNegative:
         valid_df = self.dataframe.drop(train_df.index)[["query", "pos", "p_id"]]
         return train_df, valid_df
         
-
-    def p_with_neg(self, path: str = None):
-        if path.lower() == "tevatron":
-            pass
+    def p_with_neg(self, df: pd.DataFrame) -> List[str]:
+        p_with_neg = []
+        for _, (pos, neg) in tqdm(df[["pos", "neg"]].iterrows()):
+            p_with_neg.extend([pos, neg])
+        return p_with_neg
         
-    def p_seqs(self,):
-        pass
+    def p_seqs(self, df) -> List[str]:
+        p_seqs = []
+        for _, (pos) in tqdm(df[["pos"]].iterrows()):
+            p_seqs.append(pos)
+        return p_seqs
 
-    def q_seqs(self, path: str = None):
-        pass
+    def q_seqs(self, df: pd.DataFrame) -> List[str]:
+        q_seqs = []
+        for _, (query) in tqdm(df[["query"]].iterrows()):
+            q_seqs.append(query)
+        return q_seqs
 
 
 # TODO
