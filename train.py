@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.functional as F
 from torch.utils.data import DataLoader, TensorDataset
+from torch.cuda.amp import autocast, GradScaler
 
 from model.dpr import BertEncoder
 from arguments import TrainingArguments
@@ -25,12 +26,14 @@ class DualTrainer(object):
         q_encoder: nn.Module,
         train_dataloader: DataLoader,
         valid_dataloader: DataLoader,
+        doc_dataloader: DataLoader,
         test_dataloader: DataLoader = None
     ):
         self.p_encoder = p_encoder
         self.q_encoder = q_encoder
         self.train_dataloader = train_dataloader
         self.valid_dataloader = valid_dataloader
+        self.doc_dataloader = doc_dataloader
         self.test_dataloader = test_dataloader
 
     def train(self,):
@@ -52,6 +55,7 @@ class DualTrainer(object):
             num_warmup_steps=self.args.warmup_steps,
             num_training_steps=t_total
         )
+        scaler = GradScaler()
 
         global_step = 0
 
@@ -63,8 +67,9 @@ class DualTrainer(object):
 
         train_iterator = tqdm(range(int(self.args.num_train_epochs)), desc="Epoch")
         for epoch in train_iterator:    
-            self.train_one_epoch(optimizer, scheduler, global_step)
+            self.train_one_epoch(optimizer, scheduler, scaler, global_step)
 
+            doc_embdding = self.doc2embedding(self.p_encoder)
             mrr_scores = self.validation(
 
             )
@@ -81,7 +86,19 @@ class DualTrainer(object):
         self.q_encoder.save_pretrained(os.path.join(base_path, f"q_encoder_epoch{epoch}"))
 
 
-    def validation():
+    @torch.no_grad()
+    def doc2embedding(self, p_encoder: nn.Module, doc_dataloader: DataLoader):
+        doc_embedding = []
+        p_encoder.eval()
+        for batch in tqdm(doc_dataloader):
+            output = p_encoder(**batch)
+            doc_embedding.append(output)
+        doc_embedding = torch.cat(doc_embedding, dim=0)
+        return doc_embedding
+
+
+    @torch.no_grad()
+    def validation(self, p_model: nn.Module, query_loader: DataLoader, doc_embedding: torch.Tensor):
         pass
 
 
@@ -89,6 +106,7 @@ class DualTrainer(object):
         self,
         optimizer,
         scheduler,
+        scaler,
         global_step: int
     ):
         batch_size = self.args.per_device_train_batch_size
@@ -114,23 +132,33 @@ class DualTrainer(object):
                     "token_type_ids": batch[5].to(self.args.device)
                 }
 
-                # (batch_size*(num_neg+1), emb_dim)
-                p_outputs = self.p_encoder(**p_inputs)
-                # (batch_size*, emb_dim)
-                q_outputs = self.q_encoder(**q_inputs)
+                with autocast(enabled=True):
+                    # (batch_size*(num_neg+1), emb_dim)
+                    p_outputs = self.p_encoder(**p_inputs)
+                    # (batch_size*, emb_dim)
+                    q_outputs = self.q_encoder(**q_inputs)
 
-                # Calculate similarity score & loss
-                sim_scores = torch.matmul(q_outputs, p_outputs.T).squeeze() #(batch_size, num_neg + 1)
-                sim_scores = sim_scores.view(batch_size, -1)
-                sim_scores = F.log_softmax(sim_scores, dim=1)
+                    # Calculate similarity score & loss
+                    sim_scores = torch.matmul(q_outputs, p_outputs.T).squeeze() #(batch_size, num_neg + 1)
+                    sim_scores = sim_scores.view(batch_size, -1)
+                    sim_scores = F.log_softmax(sim_scores, dim=1)
 
-                loss = F.nll_loss(sim_scores, targets)
-                tepoch.set_postfix(loss=f"{str(loss.item())}")
+                    loss = F.nll_loss(sim_scores, targets)
+                    tepoch.set_postfix(loss=f"{str(loss.item())}")
 
-                loss.backward()
-                optimizer.step()
-                scheduler.step()
 
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scale = scaler.get_scale()
+                scaler.update()
+                skip_lr_sched = (scale != scaler.get_scale())
+                if not skip_lr_sched:
+                    scheduler.step()
+
+                # loss.backward()
+                # optimizer.step()
+                # scheduler.step()
+                optimizer.zero_grad()
                 self.p_encoder.zero_grad()
                 self.q_encoder.zero_grad()
 
@@ -206,15 +234,15 @@ def get_all_docs(path: str):
     pass
 
 
-@torch.no_grad()
-def doc2embedding(p_encoder: nn.Module, dataloader: DataLoader):
-    doc_embedding = []
-    p_encoder.eval()
-    for batch in dataloader:
-        output = p_encoder(**batch)
-        doc_embedding.append(output)
-    doc_embedding = torch.cat(doc_embedding, dim=0)
-    return doc_embedding
+# @torch.no_grad()
+# def doc2embedding(p_encoder: nn.Module, dataloader: DataLoader):
+#     doc_embedding = []
+#     p_encoder.eval()
+#     for batch in dataloader:
+#         output = p_encoder(**batch)
+#         doc_embedding.append(output)
+#     doc_embedding = torch.cat(doc_embedding, dim=0)
+#     return doc_embedding
 
 
 if __name__ == "__main__":
@@ -225,4 +253,5 @@ if __name__ == "__main__":
     # trainer = DualTrainer()
     p_encoder = BertEncoder()
     q_encoder = BertEncoder()
-    
+
+
