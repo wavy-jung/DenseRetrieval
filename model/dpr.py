@@ -8,7 +8,8 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from transformers import (
     AutoTokenizer, AutoModel,
-    BertModel, BertPreTrainedModel
+    BertModel, BertPreTrainedModel,
+    T5Tokenizer, T5ForCOnditionalGeneration
 )
 # from transformers import DPRContextEncoder, DPRQuestionEncoder
 

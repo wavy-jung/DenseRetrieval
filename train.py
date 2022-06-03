@@ -3,7 +3,7 @@ import argparse
 import pandas as pd
 from src.utils import set_seed
 from tqdm import tqdm
-from typing import NoReturn, List
+from typing import Dict, List
 
 import torch
 import torch.nn as nn
@@ -23,6 +23,7 @@ class DualTrainer(object):
         args: TrainingArguments,
         p_encoder: nn.Module,
         q_encoder: nn.Module,
+        passage_with_idx: Dict[int, str],
         train_dataloader: DataLoader,
         valid_dataloader: DataLoader,
         doc_dataloader: DataLoader,
@@ -31,6 +32,7 @@ class DualTrainer(object):
         self.args = args
         self.p_encoder = p_encoder
         self.q_encoder = q_encoder
+        self.passage_with_idx = passage_with_idx
         self.train_dataloader = train_dataloader
         self.valid_dataloader = valid_dataloader
         self.doc_dataloader = doc_dataloader
@@ -69,10 +71,8 @@ class DualTrainer(object):
         for epoch in train_iterator:    
             self.train_one_epoch(optimizer, scheduler, scaler, global_step)
 
-            doc_embdding = self.doc2embedding(self.p_encoder)
-            mrr_scores = self.validation(
-
-            )
+            # doc_embdding = self.doc2embedding(self.p_encoder)
+            mrr_scores = self.validation(self.p_encoder, self.q_encoder, self.doc_dataloader, self.valid_dataloader)
 
             if best_mrr1_scores <= mrr_scores:
                 self.save_models(epoch)
@@ -103,12 +103,21 @@ class DualTrainer(object):
         self, 
         p_encoder: nn.Module,
         q_encoder: nn.Module,
-        doc_loader: DataLoader,
-        query_loader: DataLoader
+        doc_dataloader: DataLoader,
+        query_dataloader: DataLoader
         ):
-        all_embeddings = self.create_doc_embedding(p_encoder, doc_loader)
+        p_encoder.eval()
+        q_encoder.eval()
+        all_embeddings = self.create_doc_embedding(p_encoder, doc_dataloader)
         # TODO
-        
+        top100_idx = []
+        for batch in tqdm(query_dataloader):
+            output = q_encoder(**batch)
+            sim_scores = F.softmax(torch.matmul(output, all_embeddings.unsqueeze(1)), dim=1)
+            sim_ranks = torch.argsort(sim_scores, dim=1)[:,:100].detach().cpu()
+            top100_idx.append(sim_ranks)
+        top100_idx = torch.cat(top100_idx, dim=1)
+        return self.calculate_mrr(top100_idx, self.passage_with_idx)
 
 
     def train_one_epoch(
@@ -300,27 +309,31 @@ def get_all_docs(path: str):
     pass
 
 
-# @torch.no_grad()
-# def doc2embedding(p_encoder: nn.Module, dataloader: DataLoader):
-#     doc_embedding = []
-#     p_encoder.eval()
-#     for batch in dataloader:
-#         output = p_encoder(**batch)
-#         doc_embedding.append(output)
-#     doc_embedding = torch.cat(doc_embedding, dim=0)
-#     return doc_embedding
 
 
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser(description="Train Arguments")
-    # parser.add_argument("--")
-    # set_seed()
 
+    # 1. create passage, query encoder & initial setting
     p_encoder = BertEncoder()
     q_encoder = BertEncoder()
+    set_seed()
 
+    #2. set following dataloaders
+    #   train_dataloader           : q_seqs + p_with_neg
+    #   valid_dataloader           : q_seqs + p_seqs(ground truth)
+    #   passages with indices      : Dict[int, str] -> index + text
+    #   (optional) doc_dataloader  : embedding for the whole passages encoded by p_encoder
+    #   (optional) test_dataloader : contains only q_seqs
+    # TODO
 
-
+    # 3. create dual encoder trainer
+    # TODO
     trainer = DualTrainer()
+
+    # 4. train with validation
+    # TODO
+
+    # 5. inference
+    # TODO
 
 
