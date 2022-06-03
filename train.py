@@ -14,7 +14,6 @@ from torch.cuda.amp import autocast, GradScaler
 from model.dpr import BertEncoder
 from arguments import TrainingArguments
 from transformers import AdamW, get_linear_schedule_with_warmup
-from datasets import load_dataset
 
 from test import compute_metrics
 
@@ -64,7 +63,7 @@ class DualTrainer(object):
         self.q_encoder.zero_grad()
         torch.cuda.empty_cache()
 
-        best_mrr_scores = -1
+        best_mrr1_scores = -1
 
         train_iterator = tqdm(range(int(self.args.num_train_epochs)), desc="Epoch")
         for epoch in train_iterator:    
@@ -75,7 +74,7 @@ class DualTrainer(object):
 
             )
 
-            if best_mrr_scores <= mrr_scores:
+            if best_mrr1_scores <= mrr_scores:
                 self.save_models(epoch)
 
 
@@ -85,6 +84,7 @@ class DualTrainer(object):
             os.mkdir(base_path)
         self.p_encoder.save_pretrained(os.path.join(base_path, f"p_encoder_epoch{epoch}"))
         self.q_encoder.save_pretrained(os.path.join(base_path, f"q_encoder_epoch{epoch}"))
+
 
     @classmethod
     def doc2embedding(cls, p_encoder: nn.Module, doc_dataloader: DataLoader):
@@ -99,8 +99,15 @@ class DualTrainer(object):
 
 
     @torch.no_grad()
-    def validation(self, p_model: nn.Module, query_loader: DataLoader, doc_embedding: torch.Tensor):
-        pass
+    def validation(
+        self, 
+        p_encoder: nn.Module,
+        q_encoder: nn.Module,
+        doc_loader: DataLoader,
+        query_loader: DataLoader
+        ):
+        all_embeddings = self.create_doc_embedding(p_encoder, doc_loader)
+        # TODO
 
 
     def train_one_epoch(
@@ -145,8 +152,8 @@ class DualTrainer(object):
                     sim_scores = F.log_softmax(sim_scores, dim=1)
 
                     loss = F.nll_loss(sim_scores, targets)
-                    tepoch.set_postfix(loss=f"{str(loss.item())}")
 
+                tepoch.set_postfix(loss=f"{str(loss.item())}")
 
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
@@ -167,6 +174,22 @@ class DualTrainer(object):
 
                 torch.cuda.empty_cache()
 
+    @torch.no_grad()
+    def create_doc_embedding(
+        self,
+        p_encoder: nn.Module,
+        doc_dataloader: DataLoader
+    ) -> torch.tensor:
+        doc_embeddings = []
+        p_encoder.eval()
+        for batch in tqdm(doc_dataloader):
+            bsz = batch.size(0)
+            output = p_encoder(**batch).view(bsz, -1)
+            doc_embeddings.append(output)
+        doc_embeddings = torch.cat(doc_embeddings, dim=0)
+        return doc_embeddings
+
+
     @staticmethod
     def inference(
         self,
@@ -181,13 +204,11 @@ class DualTrainer(object):
             q_encoder = self.q_encoder
         if test_dataloader is None:
             test_dataloader = self.test_dataloader
+        if doc_loader is None:
+            doc_loader = self.doc_dataloader
 
         # get all doc embeddings
-        all_embeddings = []
-        for batch in tqdm(docs_loader):
-            output = p_encoder(**batch)
-            all_embeddings.append(output)
-        all_embeddings = torch.cat(all_embeddings, dim=0)
+        all_embeddings = self.create_doc_embedding(p_encoder, doc_loader)
 
         # matmul to get similarity score
         all_rankings = []
@@ -202,11 +223,25 @@ class DualTrainer(object):
         pass
         
 
-    def calculate_mrr(self, gt_idx, rankings):
-        raise NotImplementedError
-        
+    def calculate_mrr(self, indices: torch.LongTensor, targets: torch.LongTensor) -> float:
+        """
+        Calculates the MRR score for the given predictions and targets
+        Args:
+            indices (Bxk): torch.LongTensor. top-k indices predicted by the model.
+            targets (B): torch.LongTensor. actual target indices.
 
-            
+        Returns:
+            mrr (float): the mrr score
+        """
+        tmp = targets.view(-1, 1)
+        targets = tmp.expand_as(indices)
+        hits = (targets == indices).nonzero()
+        ranks = hits[:, -1] + 1
+        ranks = ranks.float()
+        rranks = torch.reciprocal(ranks)
+        mrr = torch.sum(rranks).data / targets.size(0)
+        return mrr.item() 
+        
         
 
 class Seq2SeqTrainer(object):

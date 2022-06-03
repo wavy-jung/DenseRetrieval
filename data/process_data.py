@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from rank_bm25 import BM25Okapi
 
 
-def get_bm25(corpus: List[str], tokenize_fn: Callable)->BM25Okapi:
+def get_bm25(corpus: List[str], tokenize_fn: Callable) -> BM25Okapi:
     tokenized_corpus = [tokenize_fn(txt) for txt in corpus]
     bm25 = BM25Okapi(tokenized_corpus)
     return bm25
@@ -149,4 +149,3 @@ if __name__ == "__main__":
     train_df.to_csv("./tevatron-train_df.csv", index=False)
     valid_df.to_csv("./tevatron-valid_df.csv", index=False)
 
-    
