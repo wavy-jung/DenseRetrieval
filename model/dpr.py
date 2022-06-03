@@ -13,6 +13,8 @@ from transformers import (
 )
 # from transformers import DPRContextEncoder, DPRQuestionEncoder
 
+# TODO: add bi-encoder...?
+
 
 class BertEncoder(nn.Module):
     def __init__(self, checkpoint = "bert-base-uncased"):
@@ -38,6 +40,7 @@ class BertEncoder(nn.Module):
 
 
 class Seq2SeqEncoder(nn.Module):
+    # TODO: DSI structure
     pass
 
 

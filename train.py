@@ -17,6 +17,9 @@ from transformers import AdamW, get_linear_schedule_with_warmup
 
 from test import compute_metrics
 
+# TODO
+# Add GradCache version training
+
 
 class DualTrainer(object):
     def __init__(self, 
@@ -134,8 +137,8 @@ class DualTrainer(object):
                 self.p_encoder.train()
                 self.q_encoder.train()
 
-                batch_size = len(batch[0]) # 마지막 batch에서 sample수가 다른 경우 dim. error 발생 방지하기 위해 batch_size 업데이트
-                targets = torch.arange(0, batch_size*(self.num_neg+1), (self.num_neg+1)).long() # ex) num_neg=1인 경우, 정답은 [0, 2, 4 ...] 인덱스
+                batch_size = len(batch[0]) # in case of drop_last = False
+                targets = torch.arange(0, batch_size*(self.num_neg+1), (self.num_neg+1)).long() # ex) if num_neg==1, [0, 2, 4 ...] would be gt indices
                 targets = targets.to(self.args.device)
             
                 p_inputs = {
