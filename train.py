@@ -18,7 +18,7 @@ from transformers import AdamW, get_linear_schedule_with_warmup
 from test import compute_metrics
 
 # TODO
-# Add GradCache version training
+# Add GradCache training ver.
 
 
 class DualTrainer(object):

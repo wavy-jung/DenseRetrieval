@@ -13,7 +13,7 @@ from transformers import (
 )
 # from transformers import DPRContextEncoder, DPRQuestionEncoder
 
-# TODO: add bi-encoder...?
+# TODO: add bi-encoder architecture vs. single-encoder architecture with dual-training...?
 
 
 class BertEncoder(nn.Module):
