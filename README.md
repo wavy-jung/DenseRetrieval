@@ -1,6 +1,7 @@
 # Dense Retrieval
 
 ## TODO
-1. Dense Passage Retrieval
-2. GradCache (+ Condenser)
-3. Differentiable Search Index
+1. MS-Marco Data Processing
+2. Dense Passage Retrieval
+3. GradCache (+ Condenser)
+4. Differentiable Search Index
