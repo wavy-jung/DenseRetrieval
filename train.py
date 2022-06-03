@@ -108,6 +108,7 @@ class DualTrainer(object):
         ):
         all_embeddings = self.create_doc_embedding(p_encoder, doc_loader)
         # TODO
+        
 
 
     def train_one_epoch(
@@ -196,7 +197,8 @@ class DualTrainer(object):
         p_encoder: nn.Module = None,
         q_encoder: nn.Module = None,
         test_dataloader: DataLoader = None,
-        docs_loader: DataLoader = None
+        docs_loader: DataLoader = None,
+        hit_rate_k: int = 100
     ):
         if p_encoder is None:
             p_encoder = self.p_encoder
@@ -215,7 +217,7 @@ class DualTrainer(object):
         for batch in tqdm(test_dataloader):
             output = q_encoder(**batch)
             sim_scores = F.softmax(torch.matmul(output, all_embeddings.unsqueeze(0).T).squeeze(), dim=1).detach().cpu()
-            ranking = torch.argsort(sim_scores)[:, :100]
+            ranking = torch.argsort(sim_scores)[:, :hit_rate_k]
             all_rankings.append(ranking)
         all_rankings.append(ranking)
 
