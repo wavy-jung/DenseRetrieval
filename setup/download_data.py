@@ -1,3 +1,6 @@
+# source code from
+# https://microsoft.github.io/msmarco/Datasets
+
 import csv
 import random
 import gzip
@@ -111,6 +114,3 @@ stats = generate_triples("triples.tsv", 1000)
 
 for key, val in stats.items():
     print(f"{key}\t{val}")
-
-
-    # https://msmarco.blob.core.windows.net/msmarcoranking/msmarco-doctrain-qrels.tsv.gz
