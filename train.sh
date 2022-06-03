@@ -1,3 +1,3 @@
 python train.py \
-    --model_name klue/bert-base \
+    --model_name bert-base-uncased \
     
