@@ -1,7 +1,7 @@
 import os
 import argparse
 import pandas as pd
-from src.utils import set_seed
+from utils.seed_utils import set_seed
 from tqdm import tqdm
 from typing import Dict, List
 
