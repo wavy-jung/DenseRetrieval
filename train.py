@@ -22,6 +22,7 @@ from test import compute_metrics
 
 # TODO
 # validation -> in-batch for time efficiency
+# W&B connection for monitoring
 # Add GradCache training ver.
 
 
