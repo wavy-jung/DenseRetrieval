@@ -13,7 +13,7 @@ from transformers import (
     BertModel, BertPreTrainedModel,
     T5Tokenizer, T5ForConditionalGeneration
 )
-# from transformers import DPRContextEncoder, DPRQuestionEncoder
+from transformers import DPRContextEncoder, DPRQuestionEncoder
 
 # TODO: add bi-encoder architecture vs. single-encoder architecture with dual-training...?
 
