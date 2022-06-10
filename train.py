@@ -4,6 +4,7 @@ import pandas as pd
 from utils.seed_utils import set_seed
 from tqdm import tqdm
 from typing import Dict, List
+from random import sample
 
 import torch
 import torch.nn as nn
@@ -13,7 +14,7 @@ from torch.cuda.amp import autocast, GradScaler
 
 from model.dpr import BertEncoder
 from arguments import TrainingArguments
-from transformers import AdamW, get_linear_schedule_with_warmup
+from transformers import AdamW, AutoTokenizer, get_linear_schedule_with_warmup
 
 from test import compute_metrics
 
@@ -293,7 +294,7 @@ def set_dataset(
     )
     
 
-def set_loader(dataset: TensorDataset, batch_size: int) -> DataLoader:
+def set_loader(dataset: TensorDataset, batch_size: int = 4) -> DataLoader:
     return DataLoader(
         dataset,
         shuffle=True,
@@ -319,6 +320,7 @@ if __name__ == "__main__":
     # 1. create passage, query encoder & initial setting
     p_encoder = BertEncoder()
     q_encoder = BertEncoder()
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     set_seed()
 
     #2. set following dataloaders
@@ -328,6 +330,18 @@ if __name__ == "__main__":
     #   (optional) doc_dataloader  : embedding for the whole passages encoded by p_encoder
     #   (optional) test_dataloader : contains only q_seqs
     # TODO
+    sample_num = 120000
+    df = pd.read_csv("./dataset/tevatron.csv").sample(sample_num).reset_index()
+    valid_df = df.iloc[sample(range(sample_num), int(sample_num * 0.1))]
+    train_df = df.drop(index=valid_df.index)
+    print(f"Train Samples: {len(train_df)}")
+    print(f"Valid Samples: {len(valid_df)}")
+    train_q_seqs = train_df["query"].tolist()
+    train_p_with_neg = train_df[['pos', 'neg']].to_numpy().ravel().tolist()
+    train_dataset = set_dataset(tokenizer, train_q_seqs, train_p_with_neg)
+    train_loader = set_loader(train_dataset)
+    del train_dataset
+    print(next(iter(train_loader)))
 
     # 3. create dual encoder trainer
     # TODO
