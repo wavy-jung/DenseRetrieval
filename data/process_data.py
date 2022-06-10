@@ -12,6 +12,7 @@ from rank_bm25 import BM25Okapi
 
 # TODO
 # make all the data processing complete within a line of command
+# make all dataset prepared with official ms-marco url
 
 
 def get_bm25(corpus: List[str], tokenize_fn: Callable) -> BM25Okapi:
