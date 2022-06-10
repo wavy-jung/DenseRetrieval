@@ -1,6 +1,8 @@
 import os
 import argparse
 import pandas as pd
+import numpy as np
+import json
 from utils.seed_utils import set_seed
 from tqdm import tqdm
 from typing import Dict, List
@@ -12,7 +14,7 @@ import torch.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from torch.cuda.amp import autocast, GradScaler
 
-from model.dpr import BertEncoder
+from model.dpr import BertEncoder, BiEncoder
 from arguments import TrainingArguments
 from transformers import AdamW, AutoTokenizer, get_linear_schedule_with_warmup
 
@@ -263,7 +265,7 @@ class Seq2SeqTrainer(object):
     pass
 
 
-def set_dataset(
+def in_batch_dataset(
     tokenizer,
     q_seqs,
     p_with_neg,
@@ -310,7 +312,12 @@ def doc2id():
 
 
 def get_all_docs(path: str):
-    pass
+    if path.endswith(".json"):
+        with open(path, "r") as f:
+            corpus_dict = json.load(f)
+            return corpus_dict.values()
+    else:
+        raise NotImplementedError
 
 
 
@@ -320,8 +327,9 @@ if __name__ == "__main__":
     # 1. create passage, query encoder & initial setting
     p_encoder = BertEncoder()
     q_encoder = BertEncoder()
+    biencoder = BiEncoder(q_encoder=q_encoder, p_encoder=p_encoder)
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-    set_seed()
+    set_seed(42)
 
     #2. set following dataloaders
     #   train_dataloader           : q_seqs + p_with_neg
@@ -329,23 +337,38 @@ if __name__ == "__main__":
     #   passages with indices      : Dict[int, str] -> index + text
     #   (optional) doc_dataloader  : embedding for the whole passages encoded by p_encoder
     #   (optional) test_dataloader : contains only q_seqs
-    # TODO
+
+    # sample training version
     sample_num = 120000
-    df = pd.read_csv("./dataset/tevatron.csv").sample(sample_num).reset_index()
-    valid_df = df.iloc[sample(range(sample_num), int(sample_num * 0.1))]
-    train_df = df.drop(index=valid_df.index)
+    df = pd.read_csv("./dataset/tevatron.csv")
+    passages = list(set(df["pos"].tolist()))
+    print("unique passages prepared")
+    print(f"Number of passages: {len(passages)}")
+
+    sample_df = df.sample(sample_num).reset_index()
+    valid_df = sample_df.iloc[sample(range(sample_num), int(sample_num * 0.1))]
+    train_df = sample_df.drop(index=valid_df.index)
+
     print(f"Train Samples: {len(train_df)}")
     print(f"Valid Samples: {len(valid_df)}")
+
     train_q_seqs = train_df["query"].tolist()
     train_p_with_neg = train_df[['pos', 'neg']].to_numpy().ravel().tolist()
-    train_dataset = set_dataset(tokenizer, train_q_seqs, train_p_with_neg)
+    train_dataset = in_batch_dataset(tokenizer, train_q_seqs, train_p_with_neg)
+    print("train dataset prepared")
     train_loader = set_loader(train_dataset)
     del train_dataset
-    print(next(iter(train_loader)))
+
+    valid_q_seqs = valid_df["query"].tolist()
+    valid_qrel_pids = valid_df["p_id"].tolist()
+
+    # passages = get_all_docs("./dataset/msmarco-corpus.json")
+
+    
 
     # 3. create dual encoder trainer
     # TODO
-    trainer = DualTrainer()
+    # trainer = DualTrainer()
 
     # 4. train with validation
     # TODO
