@@ -338,7 +338,7 @@ if __name__ == "__main__":
     #   (optional) doc_dataloader  : embedding for the whole passages encoded by p_encoder
     #   (optional) test_dataloader : contains only q_seqs
 
-    # sample training version
+    # small sample training version
     sample_num = 120000
     df = pd.read_csv("./dataset/tevatron.csv")
     passages = list(set(df["pos"].tolist()))
