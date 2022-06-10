@@ -21,6 +21,7 @@ from transformers import AdamW, AutoTokenizer, get_linear_schedule_with_warmup
 from test import compute_metrics
 
 # TODO
+# validation -> in-batch for time efficiency
 # Add GradCache training ver.
 
 
@@ -109,21 +110,37 @@ class DualTrainer(object):
         self, 
         p_encoder: nn.Module,
         q_encoder: nn.Module,
-        doc_dataloader: DataLoader,
-        query_dataloader: DataLoader
+        valid_dataloader: DataLoader
         ):
         p_encoder.eval()
         q_encoder.eval()
-        all_embeddings = self.create_doc_embedding(p_encoder, doc_dataloader)
+        total_mrr = 0
+        num_samples = 0
         # TODO
-        top100_idx = []
-        for batch in tqdm(query_dataloader):
-            output = q_encoder(**batch)
-            sim_scores = F.softmax(torch.matmul(output, all_embeddings.unsqueeze(1)), dim=1)
-            sim_ranks = torch.argsort(sim_scores, dim=1)[:,:100].detach().cpu()
-            top100_idx.append(sim_ranks)
-        top100_idx = torch.cat(top100_idx, dim=1)
-        return self.calculate_mrr(top100_idx, self.passage_with_idx)
+        for batch in tqdm(valid_dataloader):
+            batch_size = batch[3].size(0)
+            targets = torch.arange(0, batch_size*(self.num_neg+1), (self.num_neg+1)).long()
+            p_inputs = {
+                "input_ids": batch[0].view(batch_size * (self.num_neg + 1), -1).to(self.args.device),
+                "attention_mask": batch[1].view(batch_size * (self.num_neg+1), -1).to(self.args.device),
+                "token_type_ids": batch[2].view(batch_size * (self.num_neg+1), -1).to(self.args.device)
+            }
+            q_inputs = {
+                "input_ids": batch[3].to(self.args.device),
+                "attention_mask": batch[4].to(self.args.device),
+                "token_type_ids": batch[5].to(self.args.device)
+            }
+            p_outputs = p_encoder(**p_inputs)
+            q_outputs = q_encoder(**q_inputs)
+
+            sim_scores = torch.matmul(q_outputs, p_outputs.T).squeeze() #(batch_size, num_neg + 1)
+            sim_scores = sim_scores.view(batch_size, -1)
+            sim_scores = F.log_softmax(sim_scores, dim=1)
+            sim_ranks = torch.argsort(sim_scores, dim=1)
+            total_mrr += (self.calculate_mrr(sim_ranks.cpu(), targets.cpu()) * batch_size)
+            num_samples += batch_size
+
+        return total_mrr / num_samples
 
 
     def train_one_epoch(
@@ -133,12 +150,12 @@ class DualTrainer(object):
         scaler,
         global_step: int
     ):
+        self.p_encoder.train()
+        self.q_encoder.train()
+
         batch_size = self.args.per_device_train_batch_size
         with tqdm(self.train_dataloader, unit="batch") as tepoch:
             for batch in tepoch:
-
-                self.p_encoder.train()
-                self.q_encoder.train()
 
                 batch_size = len(batch[0]) # in case of drop_last = False
                 targets = torch.arange(0, batch_size*(self.num_neg+1), (self.num_neg+1)).long() # ex) if num_neg==1, [0, 2, 4 ...] would be gt indices
