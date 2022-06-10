@@ -8,5 +8,6 @@ def matrix_mul(query_tensor: T, ctx_tensor: T) -> T:
     return torch.matmul(query_tensor, ctx_tensor)
 
 
-def cosine_sim():
+def cosine_sim(query_tensor: T, ctx_tensor: T):
+    tensor_mul = matrix_mul(query_tensor, ctx_tensor)
     pass
