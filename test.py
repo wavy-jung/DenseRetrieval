@@ -12,6 +12,8 @@ from datasets import load_dataset
 
 MaxMRRRank = 100
 
+# TODO: create class for end-to-end inference
+
 
 def compute_metrics(qids_to_relevant_documentids, qids_to_ranked_candidate_documents, exclude_qids):
     """Compute MRR metric
