@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from transformers import (
     AutoTokenizer, AutoModel,
-    BertModel, BertPreTrainedModel,
+    BertModel, BertPreTrainedModel, BigBirdPegasusForSequenceClassification,
     T5Tokenizer, T5ForConditionalGeneration
 )
 from transformers import DPRContextEncoder, DPRQuestionEncoder
@@ -18,10 +18,10 @@ from transformers import DPRContextEncoder, DPRQuestionEncoder
 # TODO: add bi-encoder architecture vs. single-encoder architecture with dual-training...?
 
 
-class BertEncoder(BertModel):
+class BertEncoder(BertPreTrainedModel):
     def __init__(self, checkpoint = "bert-base-uncased"):
-        super(BertEncoder, self).__init__()
-        self.bert = AutoModel.from_pretrained(checkpoint)
+        super(BertEncoder, self).__init__(checkpoint)
+        self.bert = BertModel(checkpoint)
 
     def forward(self, input_ids, attention_mask=None, token_type_ids=None) -> T: 
         outputs = self.bert(
