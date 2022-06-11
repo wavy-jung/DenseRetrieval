@@ -97,7 +97,7 @@ class InBatchNegative:
 
 if __name__ == "__main__":
     dataset = InBatchNegative()
-    train_df, valid_df = dataset.split_df()
-    train_df.to_csv("./tevatron-train_df.csv", index=False)
-    valid_df.to_csv("./tevatron-valid_df.csv", index=False)
+    # train_df, valid_df = dataset.split_df()
+    # train_df.to_csv("./tevatron-train_df.csv", index=False)
+    # valid_df.to_csv("./tevatron-valid_df.csv", index=False)
 
