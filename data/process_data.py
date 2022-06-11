@@ -6,7 +6,6 @@ from datasets import load_from_disk
 from typing import List, Union, Callable
 
 from tqdm import tqdm
-import argparse
 
 from torch.utils.data import DataLoader, TensorDataset
 from rank_bm25 import BM25Okapi
@@ -97,10 +96,7 @@ class InBatchNegative:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--data_name", default="tevatron")
-    args = parser.parse_args()
-    dataset = InBatchNegative(args.data_name)
+    dataset = InBatchNegative("../dataset/tevatron")
     # train_df, valid_df = dataset.split_df()
     # train_df.to_csv("./tevatron-train_df.csv", index=False)
     # valid_df.to_csv("./tevatron-valid_df.csv", index=False)
