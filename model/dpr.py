@@ -18,10 +18,10 @@ from transformers import DPRContextEncoder, DPRQuestionEncoder
 # TODO: add bi-encoder architecture vs. single-encoder architecture with dual-training...?
 
 
-class BertEncoder(BertPreTrainedModel):
+class BertEncoder(nn.Module):
     def __init__(self, checkpoint = "bert-base-uncased"):
-        super(BertEncoder, self).__init__(checkpoint)
-        self.bert = BertModel(checkpoint)
+        super(BertEncoder, self).__init__()
+        self.bert = AutoModel.from_pretrained(checkpoint)
 
     def forward(self, input_ids, attention_mask=None, token_type_ids=None) -> T: 
         outputs = self.bert(
@@ -31,6 +31,9 @@ class BertEncoder(BertPreTrainedModel):
         )
         pooled_output = outputs["pooler_output"]
         return pooled_output
+
+    def save_pretrained(self, save_path: str):
+        torch.save(self, save_path)
 
 
 class BiEncoder(nn.Module):
