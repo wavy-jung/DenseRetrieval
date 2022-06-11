@@ -23,7 +23,7 @@ from utils.calc_utils import calculate_hit, calculate_mrr
 from shutil import rmtree
 
 # TODO
-# validation -> in-batch for time efficiency
+# dual-encoder training refactor
 # W&B connection for monitoring
 # Add GradCache training ver.
 
@@ -92,8 +92,8 @@ class DualTrainer(object):
             os.mkdir(base_path)
         p_encoder_saved = sorted([p for p in os.path.join(base_path, "*") if "p_encoder" in p], key=lambda path: int(path.split("epoch")[-1]))
         q_encoder_saved = sorted([p for p in os.path.join(base_path, "*") if "q_encoder" in p], key=lambda path: int(path.split("epoch")[-1]))
-        self.p_encoder.save_pretrained(os.path.join(base_path + "p_encoder", f"p_encoder_epoch{epoch}.pt"))
-        self.q_encoder.save_pretrained(os.path.join(base_path + "q_encoder", f"q_encoder_epoch{epoch}.pt"))
+        self.p_encoder.save_pretrained(os.path.join(base_path + "p_encoder", f"p_encoder_epoch{epoch}"))
+        self.q_encoder.save_pretrained(os.path.join(base_path + "q_encoder", f"q_encoder_epoch{epoch}"))
         print("new encoders saved")
         if len(p_encoder_saved) == 3:
             rmtree(p_encoder_saved[0])
