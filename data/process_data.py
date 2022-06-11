@@ -43,7 +43,7 @@ class InBatchNegative:
         self.base_path = "./dataset"
         self.dataframe_path = os.path.join(self.base_path, dataset_path+".csv")
         if "tevatron" in dataset_path and not os.path.exists(self.dataframe_path):
-            self.dataset = load_from_disk(dataset_path)["train"]
+            self.dataset = load_from_disk(os.path.join(self.base_path, dataset_path))["train"]
             self.dataframe = self.to_dataframe()
             self.dataframe.to_csv(self.dataframe_path, index=False)
         else:
@@ -96,7 +96,7 @@ class InBatchNegative:
 
 
 if __name__ == "__main__":
-    dataset = InBatchNegative("../dataset/tevatron")
+    dataset = InBatchNegative("tevatron")
     # train_df, valid_df = dataset.split_df()
     # train_df.to_csv("./tevatron-train_df.csv", index=False)
     # valid_df.to_csv("./tevatron-valid_df.csv", index=False)
