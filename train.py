@@ -10,7 +10,7 @@ from random import sample
 
 import torch
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from torch.cuda.amp import autocast, GradScaler
 
@@ -19,6 +19,8 @@ from arguments import TrainingArguments
 from transformers import AdamW, AutoTokenizer, get_linear_schedule_with_warmup
 
 from test import compute_metrics
+from utils.calc_utils import calculate_mrr
+from shutil import rmtree
 
 # TODO
 # validation -> in-batch for time efficiency
@@ -31,10 +33,10 @@ class DualTrainer(object):
         args: TrainingArguments,
         p_encoder: nn.Module,
         q_encoder: nn.Module,
-        passage_with_idx: Dict[int, str],
         train_dataloader: DataLoader,
         valid_dataloader: DataLoader,
-        doc_dataloader: DataLoader,
+        passage_with_idx: Dict[int, str] = None,
+        doc_dataloader: DataLoader = None,
         test_dataloader: DataLoader = None
     ):
         self.args = args
@@ -79,7 +81,6 @@ class DualTrainer(object):
         for epoch in train_iterator:    
             self.train_one_epoch(optimizer, scheduler, scaler, global_step)
 
-            # doc_embdding = self.doc2embedding(self.p_encoder)
             mrr_scores = self.validation(self.p_encoder, self.q_encoder, self.doc_dataloader, self.valid_dataloader)
 
             if best_mrr1_scores <= mrr_scores:
@@ -90,8 +91,16 @@ class DualTrainer(object):
         base_path = "./encoder/"
         if not os.path.exists(base_path):
             os.mkdir(base_path)
+        p_encoder_saved = sorted([p for p in os.path.join(base_path, "*") if "p_encoder" in p], key=lambda path: int(path.split("epoch")[-1]))
+        q_encoder_saved = sorted([p for p in os.path.join(base_path, "*") if "q_encoder" in p], key=lambda path: int(path.split("epoch")[-1]))
         self.p_encoder.save_pretrained(os.path.join(base_path, f"p_encoder_epoch{epoch}"))
         self.q_encoder.save_pretrained(os.path.join(base_path, f"q_encoder_epoch{epoch}"))
+        print("new encoders saved")
+        if len(p_encoder_saved) == 3:
+            rmtree(p_encoder_saved[0])
+        if len(q_encoder_saved) == 3:
+            rmtree(q_encoder_saved[0])
+        print("old encoders removed")
 
 
     @classmethod
@@ -118,13 +127,13 @@ class DualTrainer(object):
         total_mrr = 0
         num_samples = 0
         # TODO
-        for batch in tqdm(valid_dataloader):
+        for batch in tqdm(valid_dataloader, desc="dev"):
             batch_size = batch[3].size(0)
-            targets = torch.arange(0, batch_size*(self.num_neg+1), (self.num_neg+1)).long()
+            targets = torch.arange(0, batch_size*(self.args.valid_num_neg+1), (self.args.valid_num_neg+1)).long()
             p_inputs = {
-                "input_ids": batch[0].view(batch_size * (self.num_neg + 1), -1).to(self.args.device),
-                "attention_mask": batch[1].view(batch_size * (self.num_neg+1), -1).to(self.args.device),
-                "token_type_ids": batch[2].view(batch_size * (self.num_neg+1), -1).to(self.args.device)
+                "input_ids": batch[0].view(batch_size * (self.args.valid_num_neg + 1), -1).to(self.args.device),
+                "attention_mask": batch[1].view(batch_size * (self.args.valid_num_neg+1), -1).to(self.args.device),
+                "token_type_ids": batch[2].view(batch_size * (self.args.valid_num_neg+1), -1).to(self.args.device)
             }
             q_inputs = {
                 "input_ids": batch[3].to(self.args.device),
@@ -138,7 +147,7 @@ class DualTrainer(object):
             sim_scores = sim_scores.view(batch_size, -1)
             sim_scores = F.log_softmax(sim_scores, dim=1)
             sim_ranks = torch.argsort(sim_scores, dim=1)
-            total_mrr += (self.calculate_mrr(sim_ranks.cpu(), targets.cpu()) * batch_size)
+            total_mrr += calculate_mrr(sim_ranks.cpu(), targets) * batch_size
             num_samples += batch_size
 
         return total_mrr / num_samples
@@ -159,13 +168,13 @@ class DualTrainer(object):
             for batch in tepoch:
 
                 batch_size = len(batch[0]) # in case of drop_last = False
-                targets = torch.arange(0, batch_size*(self.num_neg+1), (self.num_neg+1)).long() # ex) if num_neg==1, [0, 2, 4 ...] would be gt indices
+                targets = torch.arange(0, batch_size*(self.args.train_num_neg+1), (self.args.train_num_neg+1)).long() # ex) if num_neg==1, [0, 2, 4 ...] would be gt indices
                 targets = targets.to(self.args.device)
             
                 p_inputs = {
-                    "input_ids": batch[0].view(batch_size * (self.num_neg + 1), -1).to(self.args.device),
-                    "attention_mask": batch[1].view(batch_size * (self.num_neg+1), -1).to(self.args.device),
-                    "token_type_ids": batch[2].view(batch_size * (self.num_neg+1), -1).to(self.args.device)
+                    "input_ids": batch[0].view(batch_size * (self.args.train_num_neg + 1), -1).to(self.args.device),
+                    "attention_mask": batch[1].view(batch_size * (self.args.train_num_neg+1), -1).to(self.args.device),
+                    "token_type_ids": batch[2].view(batch_size * (self.args.train_num_neg+1), -1).to(self.args.device)
                 }
             
                 q_inputs = {
@@ -207,6 +216,7 @@ class DualTrainer(object):
                 global_step += 1
 
                 torch.cuda.empty_cache()
+
 
     @torch.no_grad()
     def create_doc_embedding(
@@ -257,25 +267,6 @@ class DualTrainer(object):
         # calculate up to MRR@100
         pass
         
-
-    def calculate_mrr(self, indices: torch.LongTensor, targets: torch.LongTensor) -> float:
-        """
-        Calculates the MRR score for the given predictions and targets
-        Args:
-            indices (Bxk): torch.LongTensor. top-k indices predicted by the model.
-            targets (B): torch.LongTensor. actual target indices.
-
-        Returns:
-            mrr (float): the mrr score
-        """
-        tmp = targets.view(-1, 1)
-        targets = tmp.expand_as(indices)
-        hits = (targets == indices).nonzero()
-        ranks = hits[:, -1] + 1
-        ranks = ranks.float()
-        rranks = torch.reciprocal(ranks)
-        mrr = torch.sum(rranks).data / targets.size(0)
-        return mrr.item() 
         
         
 
@@ -357,7 +348,7 @@ if __name__ == "__main__":
     #   (optional) test_dataloader : contains only q_seqs
 
     # small sample training version
-    sample_num = 120000
+    sample_num = 1200
     df = pd.read_csv("./dataset/tevatron.csv")
     passages = list(set(df["pos"].tolist()))
     print("unique passages prepared")
@@ -378,10 +369,21 @@ if __name__ == "__main__":
     del train_dataset
 
     valid_q_seqs = valid_df["query"].tolist()
-    valid_qrel_pids = valid_df["p_id"].tolist()
+    valid_p_seqs = valid_df[['pos', 'neg']].to_numpy().ravel().tolist()
+    valid_dataset = in_batch_dataset(tokenizer, valid_q_seqs, valid_p_seqs)
+    print("validation dataset prepared")
+    valid_loader = set_loader(valid_dataset)
+    del valid_dataset
 
-    # passages = get_all_docs("./dataset/msmarco-corpus.json")
+    trainer = DualTrainer(
+        args=TrainingArguments,
+        p_encoder=p_encoder,
+        q_encoder=q_encoder,
+        train_dataloader=train_loader,
+        valid_dataloader=valid_loader
+    )
 
+    trainer.train()
     
 
     # 3. create dual encoder trainer
