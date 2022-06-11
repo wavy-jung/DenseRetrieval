@@ -48,6 +48,7 @@ class DualTrainer(object):
         self.doc_dataloader = doc_dataloader
         self.test_dataloader = test_dataloader
 
+
     def train(self,):
         no_decay = ["bias", "LayerNorm.weight"]
         optimizer_grouped_parameters = [
@@ -84,6 +85,7 @@ class DualTrainer(object):
             print(f"epoch {epoch} \nval mrr score: {mrr_scores:.4f}\n val hit rate: {hit_scores:.4f}")
             if best_mrr1_scores <= mrr_scores:
                 self.save_models(epoch)
+
 
     def train_one_epoch(
         self,
@@ -271,7 +273,7 @@ class DualTrainer(object):
         all_rankings.append(ranking)
 
         # calculate up to MRR@100
-        pass
+        raise NotImplementedError
         
         
         
