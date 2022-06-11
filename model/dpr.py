@@ -33,7 +33,7 @@ class BertEncoder(nn.Module):
         return pooled_output
 
     def save_pretrained(self, save_path: str):
-        torch.save(self.load_state_dict(), save_path)
+        torch.save(self.state_dict(), save_path)
 
 
 class BiEncoder(nn.Module):
