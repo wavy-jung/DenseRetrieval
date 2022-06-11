@@ -11,7 +11,7 @@ def save_data(dataname: str, path: str):
 
 
 def cache_data(args):
-    base_path = "../dataset/"
+    base_path = "./dataset/"
     if not os.path.exists(base_path):
         os.mkdir(base_path)
 
