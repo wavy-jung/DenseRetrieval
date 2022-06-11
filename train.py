@@ -40,8 +40,8 @@ class DualTrainer(object):
         test_dataloader: DataLoader = None
     ):
         self.args = args
-        self.p_encoder = p_encoder
-        self.q_encoder = q_encoder
+        self.p_encoder = p_encoder.to(args.device)
+        self.q_encoder = q_encoder.to(args.device)
         self.passage_with_idx = passage_with_idx
         self.train_dataloader = train_dataloader
         self.valid_dataloader = valid_dataloader
