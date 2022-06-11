@@ -40,7 +40,7 @@ def cleanse_kor_corpus(corpus: Any[List, str]) -> Any[List, str]:
 class InBatchNegative:
     def __init__(self, dataset_path: str, split: float = 0.2, num_neg: int = 1):
         self.split = split
-        self.base_path = "./"
+        self.base_path = "./dataset"
         self.dataframe_path = os.path.join(self.base_path, dataset_path+".csv")
         if "tevatron" in dataset_path and not os.path.exists(self.dataframe_path):
             self.dataset = load_from_disk(os.path.join(dataset_path))["train"]
