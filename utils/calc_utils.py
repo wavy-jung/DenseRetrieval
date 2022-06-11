@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor as T
+from typing import Union
 
 
 def matrix_mul(query_tensor: T, ctx_tensor: T) -> T:
@@ -30,3 +31,10 @@ def calculate_mrr(indices: torch.LongTensor, targets: torch.LongTensor) -> float
         rranks = torch.reciprocal(ranks)
         mrr = torch.sum(rranks).data / targets.size(0)
         return mrr.item() 
+
+
+def calculate_hit(indices: T, targets: torch.LongTensor) -> float:
+    hit_rate_T = (indices == targets.reshape(-1, 1)).any(1).float().mean()
+    return float(hit_rate_T)
+    
+    
