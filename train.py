@@ -19,7 +19,7 @@ from arguments import TrainingArguments
 from transformers import AdamW, AutoTokenizer, get_linear_schedule_with_warmup
 
 from test import compute_metrics
-from utils.calc_utils import calculate_mrr
+from utils.calc_utils import calculate_hit, calculate_mrr
 from shutil import rmtree
 
 # TODO
@@ -80,8 +80,8 @@ class DualTrainer(object):
         train_iterator = tqdm(range(int(self.args.num_train_epochs)), desc="Epoch")
         for epoch in train_iterator:    
             self.train_one_epoch(optimizer, scheduler, scaler, global_step)
-            mrr_scores = self.validation(self.p_encoder, self.q_encoder, self.valid_dataloader)
-            print(f"epoch {epoch} val mrr score: {mrr_scores:.4f}")
+            mrr_scores, hit_scores = self.validation(self.p_encoder, self.q_encoder, self.valid_dataloader)
+            print(f"epoch {epoch} \nval mrr score: {mrr_scores:.4f}\n val hit rate: {hit_scores:.4f}")
             if best_mrr1_scores <= mrr_scores:
                 self.save_models(epoch)
 
@@ -92,8 +92,8 @@ class DualTrainer(object):
             os.mkdir(base_path)
         p_encoder_saved = sorted([p for p in os.path.join(base_path, "*") if "p_encoder" in p], key=lambda path: int(path.split("epoch")[-1]))
         q_encoder_saved = sorted([p for p in os.path.join(base_path, "*") if "q_encoder" in p], key=lambda path: int(path.split("epoch")[-1]))
-        self.p_encoder.save_pretrained(os.path.join(base_path, f"p_encoder_epoch{epoch}"))
-        self.q_encoder.save_pretrained(os.path.join(base_path, f"q_encoder_epoch{epoch}"))
+        self.p_encoder.save_pretrained(os.path.join(base_path + "p_encoder", f"p_encoder_epoch{epoch}.pt"))
+        self.q_encoder.save_pretrained(os.path.join(base_path + "q_encoder", f"q_encoder_epoch{epoch}.pt"))
         print("new encoders saved")
         if len(p_encoder_saved) == 3:
             rmtree(p_encoder_saved[0])
@@ -124,6 +124,7 @@ class DualTrainer(object):
         p_encoder.eval()
         q_encoder.eval()
         total_mrr = 0
+        total_hit = 0
         num_samples = 0
         # TODO
         for batch in tqdm(valid_dataloader, desc="dev"):
@@ -144,12 +145,12 @@ class DualTrainer(object):
 
             sim_scores = torch.matmul(q_outputs, p_outputs.T).squeeze() #(batch_size, num_neg + 1)
             sim_scores = sim_scores.view(batch_size, -1)
-            sim_scores = F.log_softmax(sim_scores, dim=1)
-            sim_ranks = torch.argsort(sim_scores, dim=1)
+            _, sim_ranks = torch.topk(sim_scores, sim_scores.size(1))
             total_mrr += calculate_mrr(sim_ranks.cpu(), targets) * batch_size
+            total_hit += calculate_hit(sim_ranks.cpu(), targets) * batch_size
             num_samples += batch_size
-
-        return total_mrr / num_samples
+        mean_mrr, mean_hit = total_mrr/num_samples, total_hit/num_samples
+        return mean_mrr, mean_hit
 
 
     def train_one_epoch(
