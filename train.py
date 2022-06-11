@@ -85,74 +85,6 @@ class DualTrainer(object):
             if best_mrr1_scores <= mrr_scores:
                 self.save_models(epoch)
 
-
-    def save_models(self, epoch):
-        base_path = "./encoder/"
-        if not os.path.exists(base_path):
-            os.mkdir(base_path)
-        p_encoder_saved = sorted([p for p in os.path.join(base_path, "*") if "p_encoder" in p], key=lambda path: int(path.split("epoch")[-1]))
-        q_encoder_saved = sorted([p for p in os.path.join(base_path, "*") if "q_encoder" in p], key=lambda path: int(path.split("epoch")[-1]))
-        self.p_encoder.save_pretrained(os.path.join(base_path, f"p_encoder_epoch{epoch}.pt"))
-        self.q_encoder.save_pretrained(os.path.join(base_path, f"q_encoder_epoch{epoch}.pt"))
-        print("new encoders saved")
-        if len(p_encoder_saved) == 3:
-            rmtree(p_encoder_saved[0])
-        if len(q_encoder_saved) == 3:
-            rmtree(q_encoder_saved[0])
-        print("old encoders removed")
-
-
-    @classmethod
-    def doc2embedding(cls, p_encoder: nn.Module, doc_dataloader: DataLoader):
-        doc_embedding = []
-        with torch.no_grad():
-            p_encoder.eval()
-            for batch in tqdm(doc_dataloader):
-                output = p_encoder(**batch)
-                doc_embedding.append(output)
-            doc_embedding = torch.cat(doc_embedding, dim=0)
-        return doc_embedding
-
-
-    @torch.no_grad()
-    def validation(
-        self, 
-        p_encoder: nn.Module,
-        q_encoder: nn.Module,
-        valid_dataloader: DataLoader
-        ):
-        p_encoder.eval()
-        q_encoder.eval()
-        total_mrr = 0
-        total_hit = 0
-        num_samples = 0
-        # TODO
-        for batch in tqdm(valid_dataloader, desc="dev"):
-            batch_size = batch[3].size(0)
-            targets = torch.arange(0, batch_size*(self.args.valid_num_neg+1), (self.args.valid_num_neg+1)).long()
-            p_inputs = {
-                "input_ids": batch[0].view(batch_size * (self.args.valid_num_neg + 1), -1).to(self.args.device),
-                "attention_mask": batch[1].view(batch_size * (self.args.valid_num_neg+1), -1).to(self.args.device),
-                "token_type_ids": batch[2].view(batch_size * (self.args.valid_num_neg+1), -1).to(self.args.device)
-            }
-            q_inputs = {
-                "input_ids": batch[3].to(self.args.device),
-                "attention_mask": batch[4].to(self.args.device),
-                "token_type_ids": batch[5].to(self.args.device)
-            }
-            p_outputs = p_encoder(**p_inputs)
-            q_outputs = q_encoder(**q_inputs)
-
-            sim_scores = torch.matmul(q_outputs, p_outputs.T).squeeze() #(batch_size, num_neg + 1)
-            sim_scores = sim_scores.view(batch_size, -1)
-            _, sim_ranks = torch.topk(sim_scores, sim_scores.size(1))
-            total_mrr += calculate_mrr(sim_ranks.cpu(), targets) * batch_size
-            total_hit += calculate_hit(sim_ranks.cpu(), targets) * batch_size
-            num_samples += batch_size
-        mean_mrr, mean_hit = total_mrr/num_samples, total_hit/num_samples
-        return mean_mrr, mean_hit
-
-
     def train_one_epoch(
         self,
         optimizer,
@@ -216,6 +148,80 @@ class DualTrainer(object):
                 global_step += 1
 
                 torch.cuda.empty_cache()
+
+
+    @torch.no_grad()
+    def validation(
+        self, 
+        p_encoder: nn.Module,
+        q_encoder: nn.Module,
+        valid_dataloader: DataLoader
+        ):
+        p_encoder.eval()
+        q_encoder.eval()
+
+        total_mrr = 0
+        total_hit = 0
+        num_samples = 0
+        
+        for batch in tqdm(valid_dataloader, desc="validation"):
+            batch_size = batch[3].size(0)
+            targets = torch.arange(0, batch_size*(self.args.valid_num_neg+1), (self.args.valid_num_neg+1)).long()
+            p_inputs = {
+                "input_ids": batch[0].view(batch_size * (self.args.valid_num_neg + 1), -1).to(self.args.device),
+                "attention_mask": batch[1].view(batch_size * (self.args.valid_num_neg+1), -1).to(self.args.device),
+                "token_type_ids": batch[2].view(batch_size * (self.args.valid_num_neg+1), -1).to(self.args.device)
+            }
+            q_inputs = {
+                "input_ids": batch[3].to(self.args.device),
+                "attention_mask": batch[4].to(self.args.device),
+                "token_type_ids": batch[5].to(self.args.device)
+            }
+            p_outputs = p_encoder(**p_inputs)
+            q_outputs = q_encoder(**q_inputs)
+
+            sim_scores = torch.matmul(q_outputs, p_outputs.T).squeeze() #(batch_size, num_neg + 1)
+            sim_scores = sim_scores.view(batch_size, -1)
+            _, sim_ranks = torch.topk(sim_scores, sim_scores.size(1))
+            total_mrr += calculate_mrr(sim_ranks.cpu(), targets) * batch_size
+            total_hit += calculate_hit(sim_ranks.cpu(), targets) * batch_size
+
+            num_samples += batch_size
+
+        mean_mrr, mean_hit = total_mrr/num_samples, total_hit/num_samples
+
+        return mean_mrr, mean_hit
+
+
+    def save_models(self, epoch):
+        base_path = "./encoder/"
+        if not os.path.exists(base_path):
+            os.mkdir(base_path)
+
+        p_encoder_saved = sorted([p for p in os.path.join(base_path, "*") if "p_encoder" in p], key=lambda path: int(path.split("epoch")[-1]))
+        q_encoder_saved = sorted([p for p in os.path.join(base_path, "*") if "q_encoder" in p], key=lambda path: int(path.split("epoch")[-1]))
+
+        self.p_encoder.save_pretrained(os.path.join(base_path, f"p_encoder_epoch{epoch}.pt"))
+        self.q_encoder.save_pretrained(os.path.join(base_path, f"q_encoder_epoch{epoch}.pt"))
+        print("new encoders saved")
+
+        if len(p_encoder_saved) == 3:
+            rmtree(p_encoder_saved[0])
+        if len(q_encoder_saved) == 3:
+            rmtree(q_encoder_saved[0])
+        print("old encoders removed")
+
+
+    @classmethod
+    def doc2embedding(cls, p_encoder: nn.Module, doc_dataloader: DataLoader):
+        doc_embedding = []
+        with torch.no_grad():
+            p_encoder.eval()
+            for batch in tqdm(doc_dataloader):
+                output = p_encoder(**batch)
+                doc_embedding.append(output)
+            doc_embedding = torch.cat(doc_embedding, dim=0)
+        return doc_embedding
 
 
     @torch.no_grad()
