@@ -356,7 +356,7 @@ if __name__ == "__main__":
     #   (optional) test_dataloader : contains only q_seqs
 
     # small sample training version
-    sample_num = 1200
+    sample_num = 5000
     df = pd.read_csv("./dataset/tevatron.csv")
     passages = list(set(df["pos"].tolist()))
     print("unique passages prepared")
@@ -382,7 +382,9 @@ if __name__ == "__main__":
     print("validation dataset prepared")
     valid_loader = set_loader(valid_dataset)
     del valid_dataset
+    
 
+    # 3. create dual encoder trainer
     trainer = DualTrainer(
         args=TrainingArguments,
         p_encoder=p_encoder,
@@ -391,17 +393,10 @@ if __name__ == "__main__":
         valid_dataloader=valid_loader
     )
 
-    trainer.train()
-    
-
-    # 3. create dual encoder trainer
-    # TODO
-    # trainer = DualTrainer()
-
     # 4. train with validation
-    # TODO
+    trainer.train()
 
-    # 5. inference
+    # 5. inference -> full documents
     # TODO
 
 
