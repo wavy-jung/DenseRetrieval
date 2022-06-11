@@ -18,7 +18,7 @@ from transformers import DPRContextEncoder, DPRQuestionEncoder
 # TODO: add bi-encoder architecture vs. single-encoder architecture with dual-training...?
 
 
-class BertEncoder(nn.Module):
+class BertEncoder(BertModel):
     def __init__(self, checkpoint = "bert-base-uncased"):
         super(BertEncoder, self).__init__()
         self.bert = AutoModel.from_pretrained(checkpoint)
