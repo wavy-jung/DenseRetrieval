@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import json
 from utils.seed_utils import set_seed
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from typing import Dict, List
 from random import sample
 
@@ -80,9 +80,8 @@ class DualTrainer(object):
         train_iterator = tqdm(range(int(self.args.num_train_epochs)), desc="Epoch")
         for epoch in train_iterator:    
             self.train_one_epoch(optimizer, scheduler, scaler, global_step)
-
-            mrr_scores = self.validation(self.p_encoder, self.q_encoder, self.doc_dataloader, self.valid_dataloader)
-
+            mrr_scores = self.validation(self.p_encoder, self.q_encoder, self.valid_dataloader)
+            print(f"epoch {epoch} val mrr score: {mrr_scores:.4f}")
             if best_mrr1_scores <= mrr_scores:
                 self.save_models(epoch)
 
