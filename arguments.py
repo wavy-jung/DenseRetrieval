@@ -41,3 +41,11 @@ class TrainingArguments:
     gradient_accumulation_steps: int = field(
         default=1, metadata={"help": "gradient accumulation step"}
         )
+
+    train_num_neg: int = field(
+        default=1, metadata={"help": "number of hard negative per positive"}
+    )
+
+    valid_num_neg: int = field(
+        default=1, metadata={"help": "number of hard negative during sample validation"}
+    )
