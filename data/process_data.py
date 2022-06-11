@@ -3,9 +3,10 @@ import re
 import pandas as pd
 import numpy as np
 from datasets import load_from_disk
-from typing import List, NoReturn, Union, Optional, Any, Callable, Tuple
+from typing import List, Union, Callable
 
 from tqdm import tqdm
+import argparse
 
 from torch.utils.data import DataLoader, TensorDataset
 from rank_bm25 import BM25Okapi
@@ -21,7 +22,7 @@ def get_bm25(corpus: List[str], tokenize_fn: Callable) -> BM25Okapi:
     return bm25
 
 
-def cleanse_corpus(corpus: Any[List, str]) -> Any[List, str]:
+def cleanse_corpus(corpus: Union[List, str]) -> Union[List, str]:
     if isinstance(corpus, List[str]):
         cleansed_corpus = [re.sub(f'[^- 0-9a-zA-Z]', ' ', text) for text in corpus]
         return cleansed_corpus
@@ -29,7 +30,7 @@ def cleanse_corpus(corpus: Any[List, str]) -> Any[List, str]:
         return re.sub(f'[^- 0-9a-zA-Z]', ' ', corpus)
 
 
-def cleanse_kor_corpus(corpus: Any[List, str]) -> Any[List, str]:
+def cleanse_kor_corpus(corpus: Union[List[str], str]) -> Union[List[str], str]:
     if isinstance(corpus, List[str]):
         cleansed_corpus = [re.sub(f'[^- ㄱ-ㅎㅏ-ㅣ가-힣0-9a-zA-Z]', ' ', text) for text in corpus]
         return cleansed_corpus
@@ -96,7 +97,10 @@ class InBatchNegative:
 
 
 if __name__ == "__main__":
-    dataset = InBatchNegative()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_name", default="tevatron")
+    args = parser.parse_args()
+    dataset = InBatchNegative(args.data_name)
     # train_df, valid_df = dataset.split_df()
     # train_df.to_csv("./tevatron-train_df.csv", index=False)
     # valid_df.to_csv("./tevatron-valid_df.csv", index=False)
