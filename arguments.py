@@ -19,7 +19,7 @@ class TrainingArguments:
         )
 
     per_device_eval_batch_size: int = field(
-        default=4, metadata={"help": "eval batch size (num queries per batch)"}
+        default=8, metadata={"help": "eval batch size (num queries per batch)"}
         )
 
     device: str = field(
@@ -48,4 +48,12 @@ class TrainingArguments:
 
     valid_num_neg: int = field(
         default=1, metadata={"help": "number of hard negative during sample validation"}
+    )
+
+    wandb: bool = field(
+        default=False, metadata={"help": "wheter to use w&b monitoring"}
+    )
+
+    project_name: str = field(
+        default="DenseRetreival", metadata={"help": "project name for w&b"}
     )

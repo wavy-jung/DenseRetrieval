@@ -21,6 +21,7 @@ from transformers import AdamW, AutoTokenizer, get_linear_schedule_with_warmup
 from test import compute_metrics
 from utils.calc_utils import calculate_hit, calculate_mrr
 from shutil import rmtree
+import wandb
 
 # TODO
 # dual-encoder training refactor
@@ -80,11 +81,20 @@ class DualTrainer(object):
 
         train_iterator = tqdm(range(int(self.args.num_train_epochs)), desc="Epoch")
         for epoch in train_iterator:    
-            self.train_one_epoch(optimizer, scheduler, scaler, global_step)
+            mean_train_loss = self.train_one_epoch(optimizer, scheduler, scaler, global_step)
             mrr_scores, hit_scores = self.validation(self.p_encoder, self.q_encoder, self.valid_dataloader)
             print(f"epoch {epoch} \nval mrr score: {mrr_scores:.4f}\n val hit rate: {hit_scores:.4f}")
+
+            if args.wandb:
+                wandb.log({
+                    "Train Loss" : mean_train_loss,
+                    "Valid Mean MRR": mrr_scores
+                })
+
             if best_mrr1_scores <= mrr_scores:
                 self.save_models(epoch)
+            
+
 
 
     def train_one_epoch(
@@ -98,6 +108,7 @@ class DualTrainer(object):
         self.q_encoder.train()
 
         batch_size = self.args.per_device_train_batch_size
+        total_train_loss = 0
         with tqdm(self.train_dataloader, unit="batch") as tepoch:
             for batch in tepoch:
 
@@ -131,6 +142,7 @@ class DualTrainer(object):
                     loss = F.nll_loss(sim_scores, targets)
 
                 tepoch.set_postfix(loss=f"{str(loss.item())}")
+                total_train_loss += loss.item()
 
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
@@ -150,6 +162,8 @@ class DualTrainer(object):
                 global_step += 1
 
                 torch.cuda.empty_cache()
+        
+        return total_train_loss / len(self.train_dataloader)
 
 
     @torch.no_grad()
@@ -313,11 +327,12 @@ def in_batch_dataset(
     )
     
 
-def set_loader(dataset: TensorDataset, batch_size: int = 4) -> DataLoader:
+def set_loader(dataset: TensorDataset, batch_size: int = 4, drop_last=False) -> DataLoader:
     return DataLoader(
         dataset,
         shuffle=True,
-        batch_size=batch_size
+        batch_size=batch_size,
+        drop_last=drop_last
     )
 
 def dataloader_from_df(df: pd.DataFrame, columns: List[str]):
@@ -347,6 +362,7 @@ if __name__ == "__main__":
     biencoder = BiEncoder(q_encoder=q_encoder, p_encoder=p_encoder)
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     set_seed(42)
+    args = TrainingArguments
 
     #2. set following dataloaders
     #   train_dataloader           : q_seqs + p_with_neg
@@ -356,14 +372,14 @@ if __name__ == "__main__":
     #   (optional) test_dataloader : contains only q_seqs
 
     # small sample training version
-    sample_num = 5000
+    sample_num = 10000
     df = pd.read_csv("./dataset/tevatron.csv")
     passages = list(set(df["pos"].tolist()))
     print("unique passages prepared")
     print(f"Number of passages: {len(passages)}")
 
     sample_df = df.sample(sample_num).reset_index()
-    valid_df = sample_df.iloc[sample(range(sample_num), int(sample_num * 0.1))]
+    valid_df = sample_df.iloc[sample(range(sample_num), int(sample_num * 0.2))]
     train_df = sample_df.drop(index=valid_df.index)
 
     print(f"Train Samples: {len(train_df)}")
@@ -373,20 +389,20 @@ if __name__ == "__main__":
     train_p_with_neg = train_df[['pos', 'neg']].to_numpy().ravel().tolist()
     train_dataset = in_batch_dataset(tokenizer, train_q_seqs, train_p_with_neg)
     print("train dataset prepared")
-    train_loader = set_loader(train_dataset)
+    train_loader = set_loader(train_dataset, batch_size=args.per_device_train_batch_size, drop_last=True)
     del train_dataset
 
     valid_q_seqs = valid_df["query"].tolist()
     valid_p_seqs = valid_df[['pos', 'neg']].to_numpy().ravel().tolist()
     valid_dataset = in_batch_dataset(tokenizer, valid_q_seqs, valid_p_seqs)
     print("validation dataset prepared")
-    valid_loader = set_loader(valid_dataset)
+    valid_loader = set_loader(valid_dataset, batch_size=args.per_device_eval_batch_size, drop_last=True)
     del valid_dataset
     
 
     # 3. create dual encoder trainer
     trainer = DualTrainer(
-        args=TrainingArguments,
+        args=args,
         p_encoder=p_encoder,
         q_encoder=q_encoder,
         train_dataloader=train_loader,
@@ -394,6 +410,10 @@ if __name__ == "__main__":
     )
 
     # 4. train with validation
+    if args.wandb:
+        wandb.init(project=args.project_name)
+        wandb.config.update(args)
+
     trainer.train()
 
     # 5. inference -> full documents
