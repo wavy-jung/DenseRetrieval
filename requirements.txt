@@ -9,3 +9,4 @@ torch
 tqdm
 transformers
 wget
+wandb
