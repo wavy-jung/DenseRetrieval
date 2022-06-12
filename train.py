@@ -16,7 +16,7 @@ from torch.cuda.amp import autocast, GradScaler
 
 from model.dpr import BertEncoder, BiEncoder
 from arguments import TrainingArguments
-from transformers import AdamW, AutoTokenizer, get_linear_schedule_with_warmup
+from transformers import AdamW, AutoTokenizer, get_linear_schedule_with_warmup, HfArgumentParser
 
 from test import compute_metrics
 from utils.calc_utils import calculate_hit, calculate_mrr
@@ -352,8 +352,6 @@ def get_all_docs(path: str):
         raise NotImplementedError
 
 
-
-
 if __name__ == "__main__":
 
     # 1. create passage, query encoder & initial setting
@@ -362,7 +360,8 @@ if __name__ == "__main__":
     biencoder = BiEncoder(q_encoder=q_encoder, p_encoder=p_encoder)
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     set_seed(42)
-    args = TrainingArguments
+    parser = HfArgumentParser((TrainingArguments))
+    args = parser.parse_args()
 
     #2. set following dataloaders
     #   train_dataloader           : q_seqs + p_with_neg
