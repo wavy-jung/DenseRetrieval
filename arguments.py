@@ -1,7 +1,7 @@
 from dataclasses import field, dataclass
 import torch
 
-avail_device = "cuda" if torch.cuda.is_available() else "cpu"
+avail_device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 @dataclass
 class TrainingArguments:
