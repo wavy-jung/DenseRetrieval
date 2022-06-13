@@ -377,7 +377,8 @@ if __name__ == "__main__":
     # print(f"Number of passages: {len(passages)}")
 
     # sample_df = df.sample(sample_num).reset_index()
-    valid_df = df.iloc[sample(range(sample_num), int(sample_num * 0.2))]
+    # valid_df = df.iloc[sample(range(sample_num), int(sample_num * 0.2))]
+    valid_df = df.iloc[sample(range(len(df)), int(sample_num * 0.2))]
     train_df = df.drop(index=valid_df.index)
 
     print(f"Train Samples: {len(train_df)}")
