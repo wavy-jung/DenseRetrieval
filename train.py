@@ -18,7 +18,6 @@ from model.dpr import BertEncoder, BiEncoder
 from arguments import TrainingArguments
 from transformers import AdamW, AutoTokenizer, get_linear_schedule_with_warmup, HfArgumentParser
 
-from test import compute_metrics
 from utils.calc_utils import calculate_hit, calculate_mrr
 from shutil import rmtree
 import wandb
@@ -221,11 +220,10 @@ class DualTrainer(object):
         self.q_encoder.save_pretrained(os.path.join(base_path, f"q_encoder_epoch{epoch}.pt"))
         print("new encoders saved")
 
-        if len(p_encoder_saved) == 3:
+        if len(p_encoder_saved) == 3 and len(q_encoder_saved) == 3:
             rmtree(p_encoder_saved[0])
-        if len(q_encoder_saved) == 3:
             rmtree(q_encoder_saved[0])
-        print("old encoders removed")
+            print("old encoders removed")
 
 
     @classmethod
@@ -355,13 +353,14 @@ def get_all_docs(path: str):
 if __name__ == "__main__":
 
     # 1. create passage, query encoder & initial setting
-    p_encoder = BertEncoder()
-    q_encoder = BertEncoder()
+    parser = HfArgumentParser((TrainingArguments))
+    args = parser.parse_args()
+
+    p_encoder = BertEncoder(args.p_pretrained)
+    q_encoder = BertEncoder(args.q_pretrained)
     biencoder = BiEncoder(q_encoder=q_encoder, p_encoder=p_encoder)
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     set_seed(42)
-    parser = HfArgumentParser((TrainingArguments))
-    args = parser.parse_args()
 
     #2. set following dataloaders
     #   train_dataloader           : q_seqs + p_with_neg
