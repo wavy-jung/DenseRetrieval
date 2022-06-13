@@ -8,3 +8,4 @@ https://colab.research.google.com/drive/1b2VYvxgLNbsHKvutimAN6n--Vh2WzI40?usp=sh
 2. Dense Passage Retrieval
 3. GradCache (+ Condenser)
 4. Differentiable Search Index
+5. HuggingFace Accelerate (TPU, multi-GPU)
