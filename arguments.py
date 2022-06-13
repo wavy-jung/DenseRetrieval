@@ -6,6 +6,14 @@ avail_device = "cuda" if torch.cuda.is_available() else "cpu"
 @dataclass
 class TrainingArguments:
 
+    p_pretrained: str = field(
+        default="bert-base-uncased", metadata={"help": "name or path of pretrained ctx encoder checkpoint"}
+    )
+
+    q_pretrained: str = field(
+        default="bert-base-uncased", metadata={"help": "name or path of pretrained query encoder checkpoint"}
+    )
+
     num_train_epochs: int = field(
         default=3, metadata={"help": "num train epochs"}
         )
