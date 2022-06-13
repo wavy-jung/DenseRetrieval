@@ -2,51 +2,45 @@ import numpy as np
 import time
 from tqdm import tqdm
 from pprint import pprint
-from typing import NoReturn
+from typing import NoReturn, List, Union
 
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset
+from torch import Tensor as T
+from torch.utils.data import Dataset, DataLoader
 from datasets import load_dataset
-# from model.dpr import DenseRetriever
+
+from utils.calc_utils import calculate_mrr
 
 MaxMRRRank = 100
 
 # TODO: create class for end-to-end inference
+# TODO: implement raw inference and faiss inference
 
 
-def compute_metrics(qids_to_relevant_documentids, qids_to_ranked_candidate_documents, exclude_qids):
-    """Compute MRR metric
-    Args:    
-    p_qids_to_relevant_documentids (dict): dictionary of query-document mapping
-        Dict as read in with load_reference or load_reference_from_stream
-    p_qids_to_ranked_candidate_documents (dict): dictionary of query-document candidates
-    Returns:
-        dict: dictionary of metrics {'MRR': <MRR Score>}
-    """
-    all_scores = {}
-    MRR = 0
-    qids_with_relevant_documents = 0
-    ranking = []
-    
-    for qid in qids_to_ranked_candidate_documents:
-        if qid in qids_to_relevant_documentids and qid not in exclude_qids:
-            ranking.append(0)
-            target_pid = qids_to_relevant_documentids[qid]
-            candidate_pid = qids_to_ranked_candidate_documents[qid]
-            for i in range(0, MaxMRRRank):
-                if candidate_pid[i][0] in target_pid:
-                    MRR += 1/(i + 1)
-                    ranking.pop()
-                    ranking.append(i+1)
-                    break
-    if len(ranking) == 0:
-        raise IOError("No matching QIDs found. Are you sure you are scoring the evaluation set?")
-    
-    MRR = MRR/len(qids_to_relevant_documentids)
-    all_scores['MRR @100'] = MRR
-    all_scores['QueriesRanked'] = len(set(qids_to_ranked_candidate_documents)-exclude_qids)
-    return all_scores
+@torch.no_grad()
+def inference(
+    p_encoder: nn.Module, 
+    q_encoder: nn.Module, 
+    all_docs: Union[List[str], DataLoader], 
+    q_seqs: List[str],
+    q_gt_indices: List[int] = None
+    ):
+    p_encoder.eval()
+    q_encoder.eval()
+    if isinstance(all_docs, List[str]):
+        docs_dataloader: DataLoader = get_docs_dataloader(all_docs)
+    else:
+        docs_dataloader = all_docs
+    docs_embedding: T = get_docs_embeddings(p_encoder, docs_dataloader)
+    q_seqs_loader: DataLoader = get_query_loader(q_seqs)
+
+
+
+
+
+
+
 
 
 # def raw_inference(retriever: DenseRetriever, valid_dataset: Dataset)->NoReturn:
