@@ -370,15 +370,15 @@ if __name__ == "__main__":
     #   (optional) test_dataloader : contains only q_seqs
 
     # small sample training version
-    sample_num = 10000
+    # sample_num = 10000
     df = pd.read_csv("./dataset/tevatron.csv")
-    passages = list(set(df["pos"].tolist()))
+    # passages = list(set(df["pos"].tolist()))
     print("unique passages prepared")
-    print(f"Number of passages: {len(passages)}")
+    # print(f"Number of passages: {len(passages)}")
 
-    sample_df = df.sample(sample_num).reset_index()
-    valid_df = sample_df.iloc[sample(range(sample_num), int(sample_num * 0.2))]
-    train_df = sample_df.drop(index=valid_df.index)
+    # sample_df = df.sample(sample_num).reset_index()
+    valid_df = df.iloc[sample(range(sample_num), int(sample_num * 0.2))]
+    train_df = df.drop(index=valid_df.index)
 
     print(f"Train Samples: {len(train_df)}")
     print(f"Valid Samples: {len(valid_df)}")
